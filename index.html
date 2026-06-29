@@ -675,11 +675,22 @@ t<!DOCTYPE html>
   <div class="modal">
     <h2>➕ Nouveau lot</h2>
     <div class="form-grid">
-      <div><label>N° Lot *</label><input id="nl-num" placeholder="ex: 70450" oninput="mettreAJourNumerosPalettes()"></div>
-      <div><label>Parcelle *</label><input id="nl-parcelle" placeholder="A12"></div>
+      <!-- 1. Parcelle en premier : remplit espèce + variété automatiquement -->
+      <div style="grid-column:1/-1">
+        <label>Parcelle * <span id="nl-parcelle-status" style="font-weight:400;color:#888;font-size:.8rem;"></span></label>
+        <div class="combo-wrap">
+          <input id="nl-parcelle" placeholder="Tapez le code parcelle (ex: 1.01)…" autocomplete="off"
+            oninput="filtrerParcellesCombo('nl')"
+            onfocus="ouvrirComboParcel('nl')"
+            onblur="setTimeout(()=>fermerComboParcel('nl'),200)">
+          <div id="nl-parcelle-list" class="combo-list"></div>
+        </div>
+      </div>
+      <!-- 2. Espèce + Variété (remplis auto, verrouillés après choix parcelle) -->
       <div>
         <label>Espèce *</label>
         <select id="nl-espece" onchange="chargerVarietesSelect()">
+          <option value="">— sélectionner une parcelle —</option>
           <option value="Pêche jaune">Pêche jaune</option>
           <option value="Pêche blanche">Pêche blanche</option>
           <option value="Nectarine jaune">Nectarine jaune</option>
@@ -689,8 +700,11 @@ t<!DOCTYPE html>
       </div>
       <div>
         <label>Variété *</label>
-        <select id="nl-variete"><option value="">— choisir —</option></select>
+        <select id="nl-variete"><option value="">— sélectionner une parcelle —</option></select>
       </div>
+      <!-- 3. N° Lot -->
+      <div><label>N° Lot *</label><input id="nl-num" placeholder="ex: 70450" oninput="mettreAJourNumerosPalettes()"></div>
+      <!-- 4. Date de récolte (aujourd'hui par défaut, modifiable) -->
       <div><label>Date de récolte *</label><input id="nl-date" type="date"></div>
     </div>
     <hr class="sep">
@@ -749,7 +763,13 @@ t<!DOCTYPE html>
     <h2>✎ Modifier le lot</h2>
     <div class="form-grid">
       <div><label>N° Lot *</label><input id="el-num" placeholder="ex: 70450"></div>
-      <div><label>Parcelle *</label><input id="el-parcelle" placeholder="A12"></div>
+      <div>
+        <label>Parcelle *</label>
+        <div class="combo-wrap">
+          <input id="el-parcelle" placeholder="ex: 1.01" autocomplete="off" oninput="filtrerParcellesCombo('el')" onfocus="ouvrirComboParcel('el')" onblur="setTimeout(()=>fermerComboParcel('el'),180)">
+          <div id="el-parcelle-list" class="combo-list"></div>
+        </div>
+      </div>
       <div>
         <label>Espèce *</label>
         <select id="el-espece" onchange="chargerVarietesSelectEdit()">
@@ -787,39 +807,86 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let lots = [], palettes = [], camions = [], parcelles = [];
+
+// ─── COMBOBOX PARCELLE ───
+// Retourne la parcelle correspondant à un code (insensible à la casse)
 function getParcelleByCode(code) {
   if (!code) return null;
-
   return parcelles.find(p =>
-    (p.code_parcelle || '').trim().toUpperCase() ===
-    code.trim().toUpperCase()
+    (p.code_parcelle || '').trim().toUpperCase() === code.trim().toUpperCase()
   );
 }
-document.addEventListener('DOMContentLoaded', () => {
-  const input = document.getElementById('codeParcelle');
-  const espece = document.getElementById('espece');
-  const variete = document.getElementById('variete');
 
-  if (!input || !espece || !variete) return;
+// Construit le label affiché dans la liste déroulante
+function labelParcelle(p) {
+  return `${p.code_parcelle} — ${p.espece} · ${p.variete}`;
+}
 
-  input.addEventListener('input', () => {
-    const parcelle = getParcelleByCode(input.value);
+// Ouvre la combo et affiche toutes les parcelles
+function ouvrirComboParcel(prefix) {
+  filtrerParcellesCombo(prefix);
+  document.getElementById(prefix + '-parcelle-list').classList.add('open');
+}
+function fermerComboParcel(prefix) {
+  document.getElementById(prefix + '-parcelle-list').classList.remove('open');
+}
 
-    if (parcelle) {
-      espece.value = parcelle.espece || '';
-      variete.value = parcelle.variete || '';
+// Filtre la liste selon ce qui est saisi
+function filtrerParcellesCombo(prefix) {
+  const input = document.getElementById(prefix + '-parcelle');
+  const list  = document.getElementById(prefix + '-parcelle-list');
+  const q = input.value.trim().toLowerCase();
+  const filtered = parcelles.filter(p =>
+    !q ||
+    (p.code_parcelle || '').toLowerCase().includes(q) ||
+    (p.espece || '').toLowerCase().includes(q) ||
+    (p.variete || '').toLowerCase().includes(q)
+  );
+  list.innerHTML = filtered.length
+    ? filtered.map(p => `<div class="combo-item" onmousedown="selectionnerParcelle('${prefix}','${p.code_parcelle}')">${labelParcelle(p)}</div>`).join('')
+    : '<div class="combo-item" style="color:#aaa;font-style:italic">Aucune parcelle trouvée</div>';
+  list.classList.add('open');
+}
 
-      espece.disabled = true;
-      variete.disabled = true;
-    } else {
-      espece.value = '';
-      variete.value = '';
+// Sélectionne une parcelle et remplit espèce + variété automatiquement
+function selectionnerParcelle(prefix, codeParcelle) {
+  const p = getParcelleByCode(codeParcelle);
+  if (!p) return;
 
-      espece.disabled = false;
-      variete.disabled = false;
-    }
-  });
-});
+  document.getElementById(prefix + '-parcelle').value = p.code_parcelle;
+  fermerComboParcel(prefix);
+
+  // Espèce : correspondance entre les valeurs Supabase (majuscules) et l'app
+  const especeMap = {
+    'PECHE JAUNE':        'Pêche jaune',
+    'PÊCHE JAUNE':        'Pêche jaune',
+    'PECHE BLANCHE':      'Pêche blanche',
+    'PÊCHE BLANCHE':      'Pêche blanche',
+    'NECTARINE JAUNE':    'Nectarine jaune',
+    'NECTARINE BLANCHE':  'Nectarine blanche',
+    'ABRICOT':            'Abricot'
+  };
+  const especeRaw = (p.espece || '').toUpperCase().trim();
+  const especeVal = especeMap[especeRaw] || p.espece;
+
+  const especeSel = document.getElementById(prefix + '-espece');
+  especeSel.value = especeVal;
+  especeSel.disabled = true;
+
+  // Variété : valeur directe depuis Supabase
+  const varSel = document.getElementById(prefix + '-variete');
+  const varVal = (p.variete || '').trim();
+  varSel.innerHTML = `<option value="${varVal}" selected>${varVal}</option>`;
+  varSel.disabled = true;
+}
+
+// Réactive les champs si l'utilisateur efface la parcelle manuellement
+function reinitialiserParcelleAuto(prefix) {
+  const especeSel = document.getElementById(prefix + '-espece');
+  const varSel    = document.getElementById(prefix + '-variete');
+  especeSel.disabled = false;
+  varSel.disabled    = false;
+}
 let palettesDansCamion = [];
 let camionEnEdition = null; // pour modal détail camion
 let palettesAjoutees = []; // ajouts dans modal édition camion
@@ -868,6 +935,10 @@ async function chargerDonnees() {
   palettes = rP.data || [];
   camions = rC.data || [];
   parcelles = rPar.data || [];
+
+  // Debug : log en console si la table colis est vide ou en erreur
+  if (rPar.error) console.error('Erreur chargement table colis :', rPar.error);
+  else console.log(`✅ ${parcelles.length} parcelle(s) chargée(s) depuis la table colis`);
 }
 
 function abonnements() {
@@ -1707,15 +1778,42 @@ async function sauvegarderModifCamion(silent) {
 // ─── MODAL NOUVEAU LOT ───
 let nbPalettesForms = 0;
 
-function openModalLot() {
+async function openModalLot() {
   nbPalettesForms = 0;
   document.getElementById('nl-num').value = '';
   document.getElementById('nl-parcelle').value = '';
+  document.getElementById('nl-parcelle-list').classList.remove('open');
+  document.getElementById('nl-parcelle-status').textContent = '⏳ chargement…';
   document.getElementById('nl-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('palettes-form').innerHTML = '';
-  chargerVarietesSelect();
+
+  // Réinitialiser espèce + variété
+  const especeSel = document.getElementById('nl-espece');
+  const varSel    = document.getElementById('nl-variete');
+  especeSel.disabled = false;
+  especeSel.value = '';
+  varSel.disabled = false;
+  varSel.innerHTML = '<option value="">— sélectionner une parcelle —</option>';
+
+  // Toujours recharger depuis Supabase à l'ouverture
+  const { data, error } = await sb.from('parcelles').select('*').order('code_parcelle', { ascending: true });
+
+  if (error) {
+    console.error('Erreur Supabase parcelles :', error);
+    document.getElementById('nl-parcelle-status').textContent = `⚠️ Erreur : ${error.message}`;
+  } else if (!data || data.length === 0) {
+    parcelles = [];
+    document.getElementById('nl-parcelle-status').textContent = '⚠️ Table "parcelles" vide ou inaccessible (RLS ?)';
+    console.warn('Table parcelles retourne 0 lignes. Vérifie la RLS dans Supabase.');
+  } else {
+    parcelles = data;
+    document.getElementById('nl-parcelle-status').textContent = `✅ ${parcelles.length} parcelles chargées`;
+    console.log('Parcelles chargées :', parcelles.slice(0,3));
+  }
+
   ajouterPaletteForm();
   document.getElementById('modal-lot').style.display = 'flex';
+  document.getElementById('nl-parcelle').focus();
 }
 function closeModalLot() { document.getElementById('modal-lot').style.display = 'none'; }
 
@@ -1817,6 +1915,10 @@ function openModalEditLot(lotId) {
 
   document.getElementById('el-num').value = lotEnEdition.numero_lot;
   document.getElementById('el-parcelle').value = lotEnEdition.parcelle;
+  document.getElementById('el-parcelle-list').classList.remove('open');
+  // Réactiver espèce/variété (au cas où un précédent choix les aurait verrouillés)
+  document.getElementById('el-espece').disabled = false;
+  document.getElementById('el-variete').disabled = false;
   document.getElementById('el-espece').value = lotEnEdition.espece;
   document.getElementById('el-date').value = lotEnEdition.date_recolte;
   chargerVarietesSelectEdit();
