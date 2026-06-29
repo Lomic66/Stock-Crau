@@ -1825,7 +1825,7 @@ async function openModalLot() {
 
   ajouterPaletteForm();
   document.getElementById('modal-lot').style.display = 'flex';
-  document.getElementById('nl-parcelle').focus();
+  // Pas de .focus() ici : évite l'ouverture automatique de la liste
 }
 function closeModalLot() { document.getElementById('modal-lot').style.display = 'none'; }
 
