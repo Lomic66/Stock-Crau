@@ -179,7 +179,7 @@ t<!DOCTYPE html>
     padding: 0; z-index: 5;
   }
   .plan-pal .pp-rotate:hover { background: var(--vert-l); }
-  .plan-pal.format-100 .pp-rotate { display: none; }
+  /* .plan-pal.format-100 .pp-rotate : bouton pivot activé aussi pour 100x120 */
 
   .zone-drop { min-height: 160px; border: 2.5px dashed var(--gris-b); border-radius: 12px; padding: 12px; transition: border-color .2s, background .2s; }
   .zone-drop.drag-over { border-color: var(--vert); background: var(--vert-l); }
@@ -1045,11 +1045,11 @@ function remplirOptions(selectId, valeurs, valeurCourante) {
 }
 
 function renderPaletteCard(p, extraAttrs) {
-  const isDemi = p.demi === true || p.demi === 1;
+  const isDemi = p.format === 'demi';
   return `
     <div class="palette-card ${p.format==='100x120'?'format-100':isDemi?'format-demi':''}" draggable="true" ondragstart="dragStart(event,'${p.id}')" ondblclick="ajouterPaletteAuCamion('${p.id}')" title="Glisser ou double-cliquer pour ajouter au camion" ${extraAttrs||''}>
       ${isDemi ? '<div class="demi-stack"><span></span><span></span></div>' : ''}
-      <div class="pal-num">${p.numero_palette}${isDemi?' <span style="font-size:.7em;color:#9061f9;font-weight:700;">½</span>':''}</div>
+      <div class="pal-num">${p.numero_palette}${p.format==='demi'?' <span style="font-size:.7em;color:#9061f9;font-weight:700;">½</span>':''}</div>
       <div class="pal-poids">${fmtFormat(p.format)} · ${p.poids_kg||0} kg</div>
       <button class="btn-ajout-mobile" onclick="ajouterPaletteAuCamion('${p.id}')">+ Camion</button>
     </div>`;
@@ -1062,7 +1062,7 @@ function toggleLot(headerEl) {
 function fmtFormat(f) {
   if (f === '100x120') return '100×120';
   if (f === '80x120') return '80×120';
-  // demi géré via colonne booléenne
+  if (f === 'demi') return 'Demi-palette';
   return f;
 }
 
@@ -1131,11 +1131,11 @@ const GRID_ROWS = TRUCK_W / GRID; // 50
 // Construit les "unités de plancher" à partir des palettes (les demi-palettes sont appariées par 2)
 function construireUnites(pals) {
   const unites = [];
-  const demis = pals.filter(p => p.demi === true || p.demi === 1);
-  const autres = pals.filter(p => !(p.demi === true || p.demi === 1));
+  const demis = pals.filter(p => p.format === 'demi');
+  const autres = pals.filter(p => p.format !== 'demi');
 
   autres.forEach(p => {
-    if (p.format === '100x120') unites.push({ w: 125, l: 120, pals: [p], type: '100x120' });
+    if (p.format === '100x120') unites.push({ w: 125, l: 120, pals: [p], type: '100x120', rotation: p.rotation || 0 });
     else unites.push({ w: 80, l: 120, pals: [p], type: '80x120', rotation: p.rotation || 0 });
   });
 
@@ -1190,7 +1190,7 @@ function marquerZone(grille, cx0, cy0, cw, ch) {
 // Place une unité dans la première zone libre trouvée (balayage par colonnes puis lignes),
 // en essayant l'orientation courante puis l'orientation alternative si besoin.
 function placerUnite(grille, u) {
-  const orientations = u.type === '100x120' ? [0] : [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
+  const orientations = [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
   for (const rot of orientations) {
     const dims = dimsUnite({ ...u, rotation: rot });
     const cw = Math.round(dims.l / GRID), ch = Math.round(dims.w / GRID);
@@ -1214,7 +1214,7 @@ function placerUnite(grille, u) {
 // Place une unité en partant du bas du camion vers le haut, et de gauche à droite
 // (utilisé quand on ajoute une nouvelle palette par double-clic ou glisser-déposer).
 function placerUniteBasHaut(grille, u) {
-  const orientations = u.type === '100x120' ? [0] : [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
+  const orientations = [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
   for (const rot of orientations) {
     const dims = dimsUnite({ ...u, rotation: rot });
     const cw = Math.round(dims.l / GRID), ch = Math.round(dims.w / GRID);
@@ -1281,11 +1281,11 @@ function pivoterPaletteModal(palId) {
 }
 function pivoterPaletteCtx(palId, pals) {
   const pal = pals.find(p => p.id === palId);
-  if (!pal || pal.format === '100x120') return;
+  if (!pal) return;
   // Regrouper la palette avec son éventuelle paire de demi-palette pour la faire pivoter ensemble
   let groupe = [pal];
-  if (pal.demi === true || pal.demi === 1) {
-    const demis = pals.filter(p => p.demi === true || p.demi === 1);
+  if (pal.format === 'demi') {
+    const demis = pals.filter(p => p.format === 'demi');
     const idx = demis.indexOf(pal);
     const partenaire = idx % 2 === 0 ? demis[idx + 1] : demis[idx - 1];
     if (partenaire) groupe.push(partenaire);
@@ -1322,6 +1322,12 @@ function renderPlanInto(elId, pals, opts) {
     el.innerHTML = '<div class="empty-msg" style="padding-top:30%">Glissez des palettes depuis le stock ci-dessous</div>';
     return;
   }
+
+  // Identifier les paires de palettes 1/2 Pal pour l'effet empilement visuel
+  const demis = pals.filter(p => p.demi === true || p.demi === 1);
+  const deuxiemeDePaire = new Set();
+  for (let i = 1; i < demis.length; i += 2) deuxiemeDePaire.add(demis[i].id);
+
   el.innerHTML = pals.map(p => {
     const pos = p._pos;
     if (!pos) return '';
@@ -1336,11 +1342,15 @@ function renderPlanInto(elId, pals, opts) {
     const rotateBtn = opts.onRotate
       ? `<button class="pp-rotate" title="Pivoter cette palette" onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();${opts.onRotate}('${p.id}')">⤾</button>`
       : '';
+    // Décalage visuel pour la 2e palette de la paire (effet empilement)
+    const decalage = deuxiemeDePaire.has(p.id)
+      ? 'transform:translate(3%,6%);box-shadow:2px 3px 0 rgba(144,97,249,.5);z-index:2;'
+      : isDemiPlan ? 'z-index:1;' : '';
     return `<div class="plan-pal ${cls}" data-pal="${p.id}"
-        style="left:${xPct}%;top:${yPct}%;width:${wPct}%;height:${hPct}%;"
+        style="left:${xPct}%;top:${yPct}%;width:${wPct}%;height:${hPct}%;${decalage}"
         onpointerdown="planDragStart(event,'${p.id}','${elId}','${opts.dragCtx}')" ${dblClick} title="Glisser pour ajuster${opts.onDblClickPal?' · double-clic pour retirer':''}">
       ${rotateBtn}
-      <span class="pp-num">${p.numero_palette}</span>
+      <span class="pp-num">${p.numero_palette}${isDemiPlan ? ' <span style="font-size:.65em;opacity:.7">½</span>' : ''}</span>
       <span class="pp-sub">${lot?lot.numero_lot:''} · ${fmtFormat(p.format)}</span>
     </div>`;
   }).join('') + `<div class="plan-legende" style="position:absolute;bottom:2px;left:4px;right:4px;"></div>`;
@@ -1410,8 +1420,8 @@ function planDragEnd(e) {
   pal._pos = { ...pal._pos, x: xCm, y: yCm };
   pal._manual = true;
   // Si c'est une demi-palette, sa partenaire (empilée) suit la même position
-  if (pal.demi === true || pal.demi === 1) {
-    const demis = pals.filter(p => p.demi === true || p.demi === 1);
+  if (pal.format === 'demi') {
+    const demis = pals.filter(p => p.format === 'demi');
     const idx = demis.indexOf(pal);
     const partenaire = idx % 2 === 0 ? demis[idx + 1] : demis[idx - 1];
     if (partenaire) { partenaire._pos = { ...pal._pos }; partenaire._manual = true; }
@@ -1445,7 +1455,7 @@ function renderJauge() {
   const pct = Math.min(100, Math.round((equiv / 33) * 100));
   const restant = Math.max(0, 33 - equiv).toFixed(1);
   const cls = pct >= 100 ? 'plein' : pct >= 85 ? 'presque' : '';
-  const nbDemi = palettesDansCamion.filter(p=>p.demi===true||p.demi===1).length;
+  const nbDemi = palettesDansCamion.filter(p=>p.format==='demi').length;
   document.getElementById('jauge-zone').innerHTML = `
     <div class="jauge-label">Occupation : ${pct}% (${nbPaires80} emplacement(s) au sol sur 33 max)</div>
     <div class="jauge-bar"><div class="jauge-fill ${cls}" style="width:${pct}%"></div></div>
@@ -1672,7 +1682,7 @@ function renderModalCamion() {
       if (!p._pos) {
         if (p.pos_x != null && p.pos_y != null) {
           let w = p.format === '100x120' ? 125 : 80, l = 120;
-          if (p.rotation === 90) { const t = w; w = l; l = t; }
+          if (p.rotation === 90) { const t = w; w = l; l = t; } // fonctionne pour 80x120 ET 100x120
           p._pos = { x: p.pos_x, y: p.pos_y, w, l, rotation: p.rotation || 0, type: p.format };
         }
       }
@@ -1923,8 +1933,7 @@ async function sauvegarderLot() {
     palettesAInserer.push({
       lot_id: lot.id,
       numero_palette: `${num}-${idx}`,
-      format: row.querySelector('.pf-format').value,
-      demi: isDemi,
+      format: isDemi ? 'demi' : row.querySelector('.pf-format').value,
       poids_kg: parseFloat(row.querySelector('.pf-poids').value) || 0,
       statut: 'stock'
     });
@@ -2025,7 +2034,7 @@ function ajouterPaletteEditForm(pal) {
     <div><label>Poids (kg)</label><input type="number" step="0.1" class="pef-poids" value="${pal ? (pal.poids_kg||'') : ''}" placeholder="320"></div>
     <div style="display:flex;flex-direction:column;justify-content:flex-end;">
       <label style="white-space:nowrap;">
-        <input type="checkbox" class="pef-demi" style="width:auto;margin-right:4px;" ${pal && (pal.demi===true||pal.demi===1)?'checked':''}>1/2 Pal
+        <input type="checkbox" class="pef-demi" style="width:auto;margin-right:4px;" ${pal && pal.format==='demi'?'checked':''}>1/2 Pal
       </label>
     </div>
     <div><button class="btn btn-rouge btn-sm" onclick="supprimerPaletteEditForm(this)" style="margin-bottom:0">✕</button></div>`;
@@ -2067,15 +2076,16 @@ async function sauvegarderEditLot() {
     if (!numPalette) continue;
     const palId = row.dataset.palId;
     const isDemi = row.querySelector('.pef-demi') && row.querySelector('.pef-demi').checked;
+    const formatFinal = isDemi ? 'demi' : format;
     if (palId) {
-      aMettreAJour.push({ id: palId, numero_palette: numPalette, format: format, demi: isDemi, poids_kg: poids });
+      aMettreAJour.push({ id: palId, numero_palette: numPalette, format: formatFinal, poids_kg: poids });
     } else {
-      aInserer.push({ lot_id: lotEnEdition.id, numero_palette: numPalette, format: format, demi: isDemi, poids_kg: poids, statut: 'stock' });
+      aInserer.push({ lot_id: lotEnEdition.id, numero_palette: numPalette, format: formatFinal, poids_kg: poids, statut: 'stock' });
     }
   }
 
   for (const p of aMettreAJour) {
-    const { error } = await sb.from('palettes').update({ numero_palette: p.numero_palette, format: p.format, demi: p.demi, poids_kg: p.poids_kg }).eq('id', p.id);
+    const { error } = await sb.from('palettes').update({ numero_palette: p.numero_palette, format: p.format, poids_kg: p.poids_kg }).eq('id', p.id);
     if (error) { alert('Erreur mise à jour palette : ' + error.message); return; }
   }
   if (aInserer.length) {
