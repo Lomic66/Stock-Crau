@@ -1941,7 +1941,7 @@ function majFormatPalettes() {
 function mettreAJourNumerosPalettes() {
   const num = document.getElementById('nl-num').value.trim();
   document.querySelectorAll('#palettes-form .pf-num-display').forEach((el, i) => {
-    el.textContent = num ? `${num}-${i+1}` : `—`;
+    el.textContent = num ? `${num}-${String(i+1).padStart(2,'0')}` : `—`;
   });
 }
 
@@ -1955,7 +1955,7 @@ function ajouterPaletteForm() {
     <div>
       <label>N° Palette</label>
       <div style="padding:8px 10px;background:var(--gris);border-radius:7px;font-weight:700;font-size:.88rem;min-width:90px;" class="pf-num-display">
-        ${num ? num + '-' + nbPalettesForms : '—'}
+        ${num ? num + '-' + String(nbPalettesForms).padStart(2,'0') : '—'}
       </div>
     </div>
     <div>
@@ -1981,7 +1981,7 @@ function supprimerPaletteForm(btn) {
   // Renuméroter
   const num = document.getElementById('nl-num').value.trim();
   document.querySelectorAll('#palettes-form .pf-num-display').forEach((el, i) => {
-    el.textContent = num ? `${num}-${i+1}` : `—`;
+    el.textContent = num ? `${num}-${String(i+1).padStart(2,'0')}` : `—`;
   });
   // Mettre à jour le compteur
   nbPalettesForms = document.querySelectorAll('#palettes-form .pf-num-display').length;
@@ -2014,7 +2014,7 @@ async function sauvegarderLot() {
     const isDemi = row.querySelector('.pf-demi') && row.querySelector('.pf-demi').checked;
     palettesAInserer.push({
       lot_id: lot.id,
-      numero_palette: `${num}-${idx}`,
+      numero_palette: `${num}-${String(idx).padStart(2,'0')}`,
       format: isDemi ? 'demi' : row.querySelector('.pf-format').value,
       poids_kg: parseFloat(row.querySelector('.pf-poids').value) || 0,
       statut: 'stock'
@@ -2099,12 +2099,12 @@ function ajouterPaletteEditForm(pal) {
     const existantes = document.querySelectorAll('#palettes-edit-form .palette-edit-row').length;
     const palsLot = lotEnEdition ? palettes.filter(p => p.lot_id === lotEnEdition.id) : [];
     const maxIdx = palsLot.length + existantes + 1;
-    numAuto = numLot ? `${numLot}-${maxIdx}` : '';
+    numAuto = numLot ? `${numLot}-${String(maxIdx).padStart(2,'0')}` : '';
   }
   div.innerHTML = `
     <div>
       <label>N° Palette</label>
-      <input class="pef-num" value="${pal ? pal.numero_palette : numAuto}" placeholder="ex: 70450-1">
+      <input class="pef-num" value="${pal ? pal.numero_palette : numAuto}" placeholder="ex: 70450-01">
     </div>
     <div>
       <label>Format</label>
@@ -2438,10 +2438,22 @@ function fermerScanner() {
 
 function traiterCodeScanne(code) {
   const resultat = document.getElementById('scanner-resultat');
-  // Chercher la palette dans le stock par son numéro
-  const pal = palettes.find(p => p.numero_palette === code && p.statut === 'stock');
+  // Nettoyer : supprimer tous les espaces et caractères invisibles
+  const codeNettoye = code.replace(/\s/g, '').trim();
+  // Variantes pour la recherche : avec et sans zéros après le tiret
+  const codeSansZeros = codeNettoye.replace(/-0*(\d+)$/, (_, n) => '-' + parseInt(n, 10));
+  const codeAvecZeros = codeNettoye.replace(/-(\d+)$/, (_, n) => '-' + String(parseInt(n,10)).padStart(2,'0'));
+  // Chercher en essayant les 3 variantes
+  const pal = palettes.find(p =>
+    p.statut === 'stock' && (
+      p.numero_palette === codeNettoye ||
+      p.numero_palette === codeSansZeros ||
+      p.numero_palette === codeAvecZeros
+    )
+  );
+  const codeAffiche = codeNettoye;
   if (!pal) {
-    resultat.textContent = `⚠️ Palette "${code}" non trouvée dans le stock`;
+    resultat.textContent = `⚠️ Palette "${codeAffiche}" non trouvée dans le stock`;
     resultat.className = 'err';
     // Relancer le scan après 2 secondes
     setTimeout(() => {
@@ -2469,7 +2481,7 @@ function traiterCodeScanne(code) {
 
   // Palette trouvée
   if (palettesDansCamion.find(p => p.id === pal.id)) {
-    resultat.textContent = `ℹ️ Palette "${code}" déjà dans le chargement`;
+    resultat.textContent = `ℹ️ Palette "${codeAffiche}" déjà dans le chargement`;
     resultat.className = 'err';
   } else {
     ajouterPaletteAuCamion(pal.id);
