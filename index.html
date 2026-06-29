@@ -2263,36 +2263,32 @@ function supprimerRef(cle, val) {
 function fmt(d) { if (!d) return '—'; const [y,m,j] = d.split('-'); return `${j}/${m}/${y}`; }
 function fmtDT(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString('fr-FR') + ' ' + dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}); }
 
-// ─── GESTION DES ACCÈS ───
-// Utilisateurs par défaut (stockés dans localStorage, modifiables via panneau admin)
-const USERS_DEFAULT = [
-  { login: "admin", pass: "admin2024", isAdmin: true },
-  { login: "user",  pass: "vergers",   isAdmin: false }
-];
-
-function getUsers() {
-  const stored = localStorage.getItem('sg_users');
-  return stored ? JSON.parse(stored) : USERS_DEFAULT;
-}
-function saveUsers(users) {
-  localStorage.setItem('sg_users', JSON.stringify(users));
-}
-
+// ─── GESTION DES ACCÈS (Supabase) ───
 let currentUser = null;
+let usersCache = []; // cache local pour le panneau admin
 
-function verifierConnexion() {
+async function chargerUsers() {
+  const { data, error } = await sb.from('users').select('*').order('login');
+  if (error) { console.error('Erreur chargement users:', error); return []; }
+  usersCache = data || [];
+  return usersCache;
+}
+
+async function verifierConnexion() {
   const login = document.getElementById('login-user').value.trim();
   const pass  = document.getElementById('login-pass').value;
   const errEl = document.getElementById('login-error');
-  const users = getUsers();
-  const found = users.find(u => u.login === login && u.pass === pass);
-  if (found) {
-    currentUser = found;
-    sessionStorage.setItem('sg_auth', JSON.stringify({ login: found.login, isAdmin: found.isAdmin }));
+  errEl.classList.remove('visible');
+
+  const { data, error } = await sb.from('users')
+    .select('*').eq('login', login).eq('pass', pass).single();
+
+  if (data) {
+    currentUser = { login: data.login, isAdmin: data.is_admin, id: data.id };
+    sessionStorage.setItem('sg_auth', JSON.stringify(currentUser));
     document.getElementById('login-screen').classList.add('hidden');
-    errEl.classList.remove('visible');
-    document.getElementById('header-username').textContent = '👤 ' + found.login;
-    document.getElementById('btn-admin').style.display = found.isAdmin ? '' : 'none';
+    document.getElementById('header-username').textContent = '👤 ' + data.login;
+    document.getElementById('btn-admin').style.display = data.is_admin ? '' : 'none';
     init();
   } else {
     errEl.classList.add('visible');
@@ -2319,48 +2315,42 @@ function ouvrirAdmin() {
 function fermerAdmin() {
   document.getElementById('admin-panel').classList.remove('open');
 }
-function renderAdminUsers() {
-  const users = getUsers();
+async function renderAdminUsers() {
+  const users = await chargerUsers();
   const el = document.getElementById('admin-user-list');
-  el.innerHTML = users.map((u, i) => `
+  el.innerHTML = users.map(u => `
     <div class="user-row">
       <span>${u.login}</span>
-      <small>${u.isAdmin ? '⭐ Admin' : 'Utilisateur'}</small>
-      <button class="btn-pwd" onclick="adminChangerMdp(${i})">🔑 MDP</button>
-      ${u.login !== currentUser.login ? `<button class="btn-del" onclick="adminSupprimerUser(${i})">✕</button>` : ''}
+      <small>${u.is_admin ? '⭐ Admin' : 'Utilisateur'}</small>
+      <button class="btn-pwd" onclick="adminChangerMdp('${u.id}','${u.login}')">🔑 MDP</button>
+      ${u.login !== currentUser.login ? `<button class="btn-del" onclick="adminSupprimerUser('${u.id}','${u.login}')">✕</button>` : ''}
     </div>`).join('');
 }
-function adminSupprimerUser(i) {
-  const users = getUsers();
-  if (!confirm('Supprimer ' + users[i].login + ' ?')) return;
-  users.splice(i, 1);
-  saveUsers(users);
+async function adminSupprimerUser(id, login) {
+  if (!confirm('Supprimer ' + login + ' ?')) return;
+  await sb.from('users').delete().eq('id', id);
   renderAdminUsers();
 }
-function adminChangerMdp(i) {
-  const users = getUsers();
-  const np = prompt('Nouveau mot de passe pour ' + users[i].login + ' :');
+async function adminChangerMdp(id, login) {
+  const np = prompt('Nouveau mot de passe pour ' + login + ' :');
   if (!np) return;
-  users[i].pass = np;
-  saveUsers(users);
+  await sb.from('users').update({ pass: np }).eq('id', id);
   alert('Mot de passe modifié.');
 }
-function adminAjouterUser() {
+async function adminAjouterUser() {
   const login = document.getElementById('new-user-login').value.trim();
   const pass  = document.getElementById('new-user-pass').value;
   const isAdmin = document.getElementById('new-user-admin').checked;
   if (!login || !pass) return alert('Remplis les deux champs.');
-  const users = getUsers();
-  if (users.find(u => u.login === login)) return alert('Cet identifiant existe déjà.');
-  users.push({ login, pass, isAdmin });
-  saveUsers(users);
+  const { error } = await sb.from('users').insert({ login, pass, is_admin: isAdmin });
+  if (error) return alert('Erreur : ' + (error.message.includes('unique') ? 'Cet identifiant existe déjà.' : error.message));
   document.getElementById('new-user-login').value = '';
   document.getElementById('new-user-pass').value = '';
   document.getElementById('new-user-admin').checked = false;
   renderAdminUsers();
 }
 
-// Vérification au chargement
+// Vérification au chargement (session active)
 const _stored = sessionStorage.getItem('sg_auth');
 if (_stored) {
   const _s = JSON.parse(_stored);
