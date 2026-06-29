@@ -681,7 +681,6 @@ t<!DOCTYPE html>
         <div class="combo-wrap">
           <input id="nl-parcelle" placeholder="Tapez le code parcelle (ex: 1.01)…" autocomplete="off"
             oninput="filtrerParcellesCombo('nl')"
-            onfocus="ouvrirComboParcel('nl')"
             onblur="setTimeout(()=>fermerComboParcel('nl'),200)">
           <div id="nl-parcelle-list" class="combo-list"></div>
         </div>
@@ -766,7 +765,7 @@ t<!DOCTYPE html>
       <div>
         <label>Parcelle *</label>
         <div class="combo-wrap">
-          <input id="el-parcelle" placeholder="ex: 1.01" autocomplete="off" oninput="filtrerParcellesCombo('el')" onfocus="ouvrirComboParcel('el')" onblur="setTimeout(()=>fermerComboParcel('el'),180)">
+          <input id="el-parcelle" placeholder="ex: 1.01" autocomplete="off" oninput="filtrerParcellesCombo('el')" onblur="setTimeout(()=>fermerComboParcel('el'),180)">
           <div id="el-parcelle-list" class="combo-list"></div>
         </div>
       </div>
@@ -836,8 +835,21 @@ function filtrerParcellesCombo(prefix) {
   const input = document.getElementById(prefix + '-parcelle');
   const list  = document.getElementById(prefix + '-parcelle-list');
   const q = input.value.trim().toLowerCase();
+
+  // Si le champ est vidé → réactiver espèce + variété
+  if (!q) {
+    const especeSel = document.getElementById(prefix + '-espece');
+    const varSel    = document.getElementById(prefix + '-variete');
+    especeSel.disabled = false;
+    especeSel.value = '';
+    varSel.disabled = false;
+    if (prefix === 'nl') chargerVarietesSelect();
+    else chargerVarietesSelectEdit();
+    list.classList.remove('open');
+    return;
+  }
+
   const filtered = parcelles.filter(p =>
-    !q ||
     (p.code_parcelle || '').toLowerCase().includes(q) ||
     (p.espece || '').toLowerCase().includes(q) ||
     (p.variete || '').toLowerCase().includes(q)
