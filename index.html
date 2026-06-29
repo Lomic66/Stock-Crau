@@ -1045,11 +1045,11 @@ function remplirOptions(selectId, valeurs, valeurCourante) {
 }
 
 function renderPaletteCard(p, extraAttrs) {
-  const isDemi = p.format === 'demi';
+  const isDemi = p.demi === true || p.demi === 1;
   return `
     <div class="palette-card ${p.format==='100x120'?'format-100':isDemi?'format-demi':''}" draggable="true" ondragstart="dragStart(event,'${p.id}')" ondblclick="ajouterPaletteAuCamion('${p.id}')" title="Glisser ou double-cliquer pour ajouter au camion" ${extraAttrs||''}>
       ${isDemi ? '<div class="demi-stack"><span></span><span></span></div>' : ''}
-      <div class="pal-num">${p.numero_palette}${p.format==='demi'?' <span style="font-size:.7em;color:#9061f9;font-weight:700;">½</span>':''}</div>
+      <div class="pal-num">${p.numero_palette}${isDemi?' <span style="font-size:.7em;color:#9061f9;font-weight:700;">½</span>':''}</div>
       <div class="pal-poids">${fmtFormat(p.format)} · ${p.poids_kg||0} kg</div>
       <button class="btn-ajout-mobile" onclick="ajouterPaletteAuCamion('${p.id}')">+ Camion</button>
     </div>`;
@@ -1062,7 +1062,7 @@ function toggleLot(headerEl) {
 function fmtFormat(f) {
   if (f === '100x120') return '100×120';
   if (f === '80x120') return '80×120';
-  if (f === 'demi') return 'Demi-palette';
+  // demi géré via colonne booléenne
   return f;
 }
 
@@ -1131,8 +1131,8 @@ const GRID_ROWS = TRUCK_W / GRID; // 50
 // Construit les "unités de plancher" à partir des palettes (les demi-palettes sont appariées par 2)
 function construireUnites(pals) {
   const unites = [];
-  const demis = pals.filter(p => p.format === 'demi');
-  const autres = pals.filter(p => p.format !== 'demi');
+  const demis = pals.filter(p => p.demi === true || p.demi === 1);
+  const autres = pals.filter(p => !(p.demi === true || p.demi === 1));
 
   autres.forEach(p => {
     if (p.format === '100x120') unites.push({ w: 125, l: 120, pals: [p], type: '100x120' });
@@ -1284,8 +1284,8 @@ function pivoterPaletteCtx(palId, pals) {
   if (!pal || pal.format === '100x120') return;
   // Regrouper la palette avec son éventuelle paire de demi-palette pour la faire pivoter ensemble
   let groupe = [pal];
-  if (pal.format === 'demi') {
-    const demis = pals.filter(p => p.format === 'demi');
+  if (pal.demi === true || pal.demi === 1) {
+    const demis = pals.filter(p => p.demi === true || p.demi === 1);
     const idx = demis.indexOf(pal);
     const partenaire = idx % 2 === 0 ? demis[idx + 1] : demis[idx - 1];
     if (partenaire) groupe.push(partenaire);
@@ -1326,7 +1326,8 @@ function renderPlanInto(elId, pals, opts) {
     const pos = p._pos;
     if (!pos) return '';
     const lot = lots.find(l => l.id === p.lot_id);
-    const cls = p.format === '100x120' ? 'format-100' : p.format === 'demi' ? 'format-demi' : '';
+    const isDemiPlan = p.demi === true || p.demi === 1;
+    const cls = p.format === '100x120' ? 'format-100' : isDemiPlan ? 'format-demi' : '';
     const xPct = (pos.x / TRUCK_L) * 100;
     const yPct = (pos.y / TRUCK_W) * 100;
     const wPct = (pos.l / TRUCK_L) * 100;
@@ -1409,8 +1410,8 @@ function planDragEnd(e) {
   pal._pos = { ...pal._pos, x: xCm, y: yCm };
   pal._manual = true;
   // Si c'est une demi-palette, sa partenaire (empilée) suit la même position
-  if (pal.format === 'demi') {
-    const demis = pals.filter(p => p.format === 'demi');
+  if (pal.demi === true || pal.demi === 1) {
+    const demis = pals.filter(p => p.demi === true || p.demi === 1);
     const idx = demis.indexOf(pal);
     const partenaire = idx % 2 === 0 ? demis[idx + 1] : demis[idx - 1];
     if (partenaire) { partenaire._pos = { ...pal._pos }; partenaire._manual = true; }
@@ -1444,7 +1445,7 @@ function renderJauge() {
   const pct = Math.min(100, Math.round((equiv / 33) * 100));
   const restant = Math.max(0, 33 - equiv).toFixed(1);
   const cls = pct >= 100 ? 'plein' : pct >= 85 ? 'presque' : '';
-  const nbDemi = palettesDansCamion.filter(p=>p.format==='demi').length;
+  const nbDemi = palettesDansCamion.filter(p=>p.demi===true||p.demi===1).length;
   document.getElementById('jauge-zone').innerHTML = `
     <div class="jauge-label">Occupation : ${pct}% (${nbPaires80} emplacement(s) au sol sur 33 max)</div>
     <div class="jauge-bar"><div class="jauge-fill ${cls}" style="width:${pct}%"></div></div>
@@ -1922,7 +1923,8 @@ async function sauvegarderLot() {
     palettesAInserer.push({
       lot_id: lot.id,
       numero_palette: `${num}-${idx}`,
-      format: isDemi ? 'demi' : row.querySelector('.pf-format').value,
+      format: row.querySelector('.pf-format').value,
+      demi: isDemi,
       poids_kg: parseFloat(row.querySelector('.pf-poids').value) || 0,
       statut: 'stock'
     });
@@ -2023,7 +2025,7 @@ function ajouterPaletteEditForm(pal) {
     <div><label>Poids (kg)</label><input type="number" step="0.1" class="pef-poids" value="${pal ? (pal.poids_kg||'') : ''}" placeholder="320"></div>
     <div style="display:flex;flex-direction:column;justify-content:flex-end;">
       <label style="white-space:nowrap;">
-        <input type="checkbox" class="pef-demi" style="width:auto;margin-right:4px;" ${pal && pal.format==='demi'?'checked':''}>1/2 Pal
+        <input type="checkbox" class="pef-demi" style="width:auto;margin-right:4px;" ${pal && (pal.demi===true||pal.demi===1)?'checked':''}>1/2 Pal
       </label>
     </div>
     <div><button class="btn btn-rouge btn-sm" onclick="supprimerPaletteEditForm(this)" style="margin-bottom:0">✕</button></div>`;
@@ -2065,16 +2067,15 @@ async function sauvegarderEditLot() {
     if (!numPalette) continue;
     const palId = row.dataset.palId;
     const isDemi = row.querySelector('.pef-demi') && row.querySelector('.pef-demi').checked;
-    const formatFinal = isDemi ? 'demi' : format;
     if (palId) {
-      aMettreAJour.push({ id: palId, numero_palette: numPalette, format: formatFinal, poids_kg: poids });
+      aMettreAJour.push({ id: palId, numero_palette: numPalette, format: format, demi: isDemi, poids_kg: poids });
     } else {
-      aInserer.push({ lot_id: lotEnEdition.id, numero_palette: numPalette, format: formatFinal, poids_kg: poids, statut: 'stock' });
+      aInserer.push({ lot_id: lotEnEdition.id, numero_palette: numPalette, format: format, demi: isDemi, poids_kg: poids, statut: 'stock' });
     }
   }
 
   for (const p of aMettreAJour) {
-    const { error } = await sb.from('palettes').update({ numero_palette: p.numero_palette, format: p.format, poids_kg: p.poids_kg }).eq('id', p.id);
+    const { error } = await sb.from('palettes').update({ numero_palette: p.numero_palette, format: p.format, demi: p.demi, poids_kg: p.poids_kg }).eq('id', p.id);
     if (error) { alert('Erreur mise à jour palette : ' + error.message); return; }
   }
   if (aInserer.length) {
