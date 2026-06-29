@@ -1,0 +1,2266 @@
+t<!DOCTYPE html>
+<!-- saved from url=(0046)https://iridescent-pegasus-cce295.netlify.app/ -->
+<html lang="fr"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestion Stock Frigo – Vergers</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --vert:    #2d6a4f;
+    --vert-c:  #40916c;
+    --vert-l:  #d8f3dc;
+    --jaune:   #f4a261;
+    --jaune-l: #fff3e4;
+    --rouge:   #c1121f;
+    --gris:    #f1f5f0;
+    --gris-b:  #c8d5c4;
+    --texte:   #1b2d22;
+    --blanc:   #ffffff;
+    --ombre:   0 2px 12px rgba(45,106,79,.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--gris); color: var(--texte); min-height: 100vh; }
+
+  header { background: var(--vert); color: #fff; padding: 14px 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.18); position: sticky; top: 0; z-index: 60; }
+  header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: .02em; }
+  header span { font-size: .85rem; opacity: .75; margin-left: auto; }
+  .dot-live { width: 9px; height: 9px; border-radius: 50%; background: #74e68d; display: inline-block; margin-right: 5px; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    position: fixed; inset: 0; background: var(--vert);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  #login-screen.hidden { display: none; }
+  .login-box {
+    background: #fff; border-radius: 18px; padding: 40px 36px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.25); width: 100%; max-width: 360px;
+    display: flex; flex-direction: column; gap: 18px; align-items: center;
+  }
+  .login-box svg { color: var(--vert); }
+  .login-box h2 { font-size: 1.3rem; font-weight: 700; color: var(--vert); text-align: center; }
+  .login-box p { font-size: .85rem; color: #666; text-align: center; margin-top: -8px; }
+  .login-box input {
+    width: 100%; padding: 11px 14px; border: 1.5px solid var(--gris-b);
+    border-radius: 8px; font-size: 1rem; outline: none; transition: border .18s;
+  }
+  .login-box input:focus { border-color: var(--vert-c); }
+  .login-box button {
+    width: 100%; padding: 12px; background: var(--vert); color: #fff;
+    border: none; border-radius: 8px; font-size: 1rem; font-weight: 700;
+    cursor: pointer; transition: background .18s;
+  }
+  .login-box button:hover { background: var(--vert-c); }
+  .login-error { color: var(--rouge); font-size: .85rem; display: none; text-align:center; }
+  .login-error.visible { display: block; }
+  /* ADMIN PANEL */
+  #admin-panel {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9998; display: none;
+  }
+  #admin-panel.open { display: flex; }
+  .admin-box {
+    background: #fff; border-radius: 16px; padding: 32px 28px;
+    box-shadow: 0 8px 40px rgba(0,0,0,.3); width: 100%; max-width: 480px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .admin-box h3 { font-size: 1.1rem; font-weight: 700; color: var(--vert); margin-bottom: 18px; }
+  .user-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--gris-b); }
+  .user-row span { flex: 1; font-weight: 600; }
+  .user-row small { color: #888; font-size: .78rem; }
+  .user-row button { padding: 4px 10px; border-radius: 6px; border: none; cursor: pointer; font-size: .8rem; font-weight: 600; }
+  .btn-del { background: #fde8e8; color: var(--rouge); }
+  .btn-pwd { background: var(--vert-l); color: var(--vert); }
+  .add-user-form { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; padding-top: 18px; border-top: 1.5px solid var(--gris-b); }
+  .add-user-form h4 { font-weight: 700; color: var(--texte); }
+  .add-user-form input { padding: 9px 12px; border: 1.5px solid var(--gris-b); border-radius: 8px; font-size: .95rem; }
+  .add-user-form input:focus { outline: none; border-color: var(--vert-c); }
+  .admin-actions { display: flex; gap: 10px; margin-top: 10px; }
+  .btn-admin-open { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.4); border-radius: 7px; padding: 5px 13px; font-size: .82rem; font-weight: 600; cursor: pointer; }
+  .btn-admin-open:hover { background: rgba(255,255,255,.28); }
+  .btn-logout {
+    margin-left: auto; background: rgba(255,255,255,.15); color: #fff;
+    border: 1px solid rgba(255,255,255,.4); border-radius: 7px;
+    padding: 5px 13px; font-size: .82rem; font-weight: 600; cursor: pointer;
+    transition: background .18s;
+  }
+  .btn-logout:hover { background: rgba(255,255,255,.28); }
+
+  nav { display: flex; background: var(--blanc); border-bottom: 2px solid var(--gris-b); padding: 0 16px; overflow-x: auto; position: sticky; top: 54px; z-index: 59; }
+  nav button { padding: 12px 20px; border: none; background: none; font-size: .92rem; font-weight: 600; color: var(--vert-c); cursor: pointer; border-bottom: 3px solid transparent; transition: all .18s; white-space: nowrap; }
+  nav button.active { color: var(--vert); border-bottom-color: var(--vert); }
+  nav button:hover:not(.active) { background: var(--vert-l); }
+
+  main { padding: 20px 16px; max-width: 1200px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .card { background: var(--blanc); border-radius: 12px; padding: 18px; box-shadow: var(--ombre); margin-bottom: 16px; }
+  .card-title { font-size: 1rem; font-weight: 700; color: var(--vert); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: .75rem; font-weight: 600; }
+  .badge-pj { background: #fff3cd; color: #856404; }
+  .badge-pb { background: #fde8e8; color: #9b1c1c; }
+  .badge-nj { background: #d1fae5; color: #065f46; }
+  .badge-nb { background: #e0e7ff; color: #3730a3; }
+  .badge-ab { background: #ffe8cc; color: #92400e; }
+
+  .lot-bloc { border: 1.5px solid var(--gris-b); border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+  .lot-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; cursor: pointer; }
+  .lot-header .chevron { margin-left: auto; transition: transform .2s; color: var(--vert-c); flex-shrink: 0; }
+  .lot-bloc.collapsed .lot-header .chevron { transform: rotate(-90deg); }
+  .lot-bloc.collapsed .lot-body { display: none; }
+  .lot-num { font-weight: 700; font-size: .95rem; }
+  .lot-info { font-size: .8rem; color: #555; }
+  .palettes-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .palette-card {
+    background: var(--vert-l); border: 1.5px solid var(--vert-c); border-radius: 8px;
+    padding: 8px 12px; font-size: .8rem; cursor: grab; user-select: none;
+    transition: transform .12s, box-shadow .12s; min-width: 110px; position: relative;
+  }
+  .palette-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(45,106,79,.2); }
+  .palette-card.format-100 { background: var(--jaune-l); border-color: var(--jaune); }
+  .palette-card.format-demi { background: #f3e8ff; border-color: #9061f9; }
+  .palette-card .pal-num { font-weight: 700; color: var(--vert); font-size: .95em; }
+  .palette-card .pal-poids { color: #555; }
+  .palette-card .btn-ajout-mobile, .palette-card .btn-retirer-mobile { display: none; }
+  .demi-stack { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+  .demi-stack span { display: block; height: 5px; border-radius: 2px; background: #9061f9; opacity: .55; }
+  .demi-stack span:first-child { opacity: .9; }
+
+  /* ─── PLAN DE CHARGEMENT 2D ─── */
+  .plan-camion-wrap { display: flex; align-items: stretch; margin: 4px 0; }
+  .plan-camion {
+    position: relative; flex: 1; aspect-ratio: 1320/250;
+    background: repeating-linear-gradient(90deg, #f5f5f5 0 9.9%, #ececec 9.9% 10%);
+    border: 3px solid var(--vert-c); border-radius: 0 6px 6px 0; overflow: hidden;
+    touch-action: none;
+  }
+  .plan-pal {
+    position: absolute; box-sizing: border-box; border: 1.5px solid var(--rouge);
+    background: #fdeceb; border-radius: 4px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-size: .68rem; font-weight: 700;
+    color: var(--rouge); cursor: grab; user-select: none; overflow: hidden; padding: 2px;
+    text-align: center; line-height: 1.15;
+  }
+  .plan-pal.format-100 { background: #f9d7d4; border-color: #a3171f; }
+  .plan-pal.format-demi { background: #f6c9d6; border-color: #9d1e4a; }
+  .plan-pal.dragging { opacity: .6; z-index: 50; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .plan-pal.removing { opacity: .25; filter: grayscale(1); }
+  .plan-cabine {
+    flex: 0 0 30px; width: 30px;
+    background: repeating-linear-gradient(135deg, #d8dde2 0 6px, #cdd3d9 6px 12px);
+    border: 3px solid var(--vert-c); border-right: none; border-radius: 6px 0 0 6px;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    font-size: .6rem; color: #777; gap: 2px;
+  }
+  @media (max-width: 640px) {
+    .plan-cabine { flex-basis: 20px; width: 20px; font-size: .5rem; }
+  }
+  .plan-cabine svg { width: 16px; height: 16px; }
+  @media (max-width: 640px) { .plan-cabine svg { width: 12px; height: 12px; } }
+  .plan-pal .pp-num { font-size: .72rem; }
+  .plan-pal .pp-sub { font-size: .6rem; font-weight: 400; opacity: .75; }
+  .plan-legende { display: flex; gap: 14px; flex-wrap: wrap; font-size: .74rem; color: #666; margin-top: 6px; }
+  .plan-legende span { display: inline-flex; align-items: center; gap: 4px; }
+  .plan-legende i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1.5px solid var(--vert-c); background: var(--vert-l); }
+  .plan-legende i.l-100 { border-color: var(--jaune); background: var(--jaune-l); }
+  .plan-legende i.l-demi { border-color: #9061f9; background: #f3e8ff; }
+
+  .plan-camion.drag-over { border-color: var(--vert); box-shadow: inset 0 0 0 3px var(--vert-l); }
+  .plan-pal .pp-rotate {
+    position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; border-radius: 3px;
+    border: 1px solid var(--vert-c); background: #fff; color: var(--vert); font-size: .62rem;
+    line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    padding: 0; z-index: 5;
+  }
+  .plan-pal .pp-rotate:hover { background: var(--vert-l); }
+  .plan-pal.format-100 .pp-rotate { display: none; }
+
+  .zone-drop { min-height: 160px; border: 2.5px dashed var(--gris-b); border-radius: 12px; padding: 12px; transition: border-color .2s, background .2s; }
+  .zone-drop.drag-over { border-color: var(--vert); background: var(--vert-l); }
+  .zone-drop .empty-msg { color: #aaa; font-size: .85rem; text-align: center; padding-top: 40px; }
+
+  /* ─── MOBILE ─── */
+  @media (max-width: 640px) {
+    header { padding: 10px 12px; gap: 8px; position: static; }
+    header h1 { font-size: 1.02rem; }
+    header span { font-size: .7rem; }
+    nav { position: static; padding: 0 6px; }
+    nav button { padding: 10px 12px; font-size: .8rem; }
+    main { padding: 10px 8px; }
+    .card { padding: 12px; border-radius: 10px; margin-bottom: 10px; }
+    .card-title { font-size: .92rem; }
+    .lot-bloc { padding: 10px; }
+    .lot-header { gap: 6px; }
+    .lot-num { font-size: .85rem; }
+    .lot-info { font-size: .72rem; }
+    .lot-info.full-width { width: 100%; margin-left: 0 !important; }
+    .palettes-grid { gap: 6px; }
+    .palette-card { padding: 6px 9px; font-size: .74rem; min-width: 92px; cursor: default; }
+    .palette-card[draggable="true"] { padding-bottom: 28px; }
+    .palette-card .btn-ajout-mobile {
+      display: block; position: absolute; bottom: 2px; left: 4px; right: 4px;
+      background: var(--vert); color: #fff; border: none; border-radius: 5px;
+      font-size: .68rem; font-weight: 700; padding: 3px 0; cursor: pointer;
+    }
+    .palette-card .btn-retirer-mobile {
+      display: block; position: absolute; bottom: 2px; left: 4px; right: 4px;
+      background: var(--rouge); color: #fff; border: none; border-radius: 5px;
+      font-size: .68rem; font-weight: 700; padding: 3px 0; cursor: pointer;
+    }
+    .form-grid { gap: 8px; }
+    .btn { padding: 8px 14px; font-size: .82rem; }
+    .modal { padding: 14px; border-radius: 10px; }
+    table { font-size: .76rem; }
+    th, td { padding: 6px 6px; }
+    .detail-stat { font-size: .76rem; padding: 6px 10px; }
+  }
+
+  .jauge-wrap { margin-top: 10px; }
+  .jauge-label { font-size: .8rem; margin-bottom: 4px; font-weight: 600; }
+  .jauge-bar { height: 16px; background: var(--gris-b); border-radius: 8px; overflow: hidden; }
+  .jauge-fill { height: 100%; background: var(--vert-c); border-radius: 8px; transition: width .3s; }
+  .jauge-fill.plein { background: var(--rouge); }
+  .jauge-fill.presque { background: var(--jaune); }
+  .jauge-text { font-size: .78rem; color: #555; margin-top: 3px; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+  label { font-size: .82rem; font-weight: 600; color: var(--vert); display: block; margin-bottom: 3px; }
+  input, textarea, select {
+    width: 100%; padding: 8px 10px; border: 1.5px solid var(--gris-b);
+    border-radius: 7px; font-size: .88rem; outline: none; transition: border-color .18s; background: #fff;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--vert-c); }
+  textarea { resize: vertical; min-height: 60px; }
+
+  /* Combobox (select + saisie libre) */
+  .combo-wrap { position: relative; }
+  .combo-wrap input { padding-right: 30px; }
+  .combo-list { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1.5px solid var(--vert-c); border-radius: 0 0 7px 7px; z-index: 50; max-height: 180px; overflow-y: auto; display: none; }
+  .combo-list.open { display: block; }
+  .combo-item { padding: 7px 10px; cursor: pointer; font-size: .87rem; }
+  .combo-item:hover { background: var(--vert-l); }
+  .combo-item.new-item { color: var(--vert-c); font-style: italic; }
+
+  .btn { padding: 9px 20px; border: none; border-radius: 8px; font-weight: 700; font-size: .88rem; cursor: pointer; transition: opacity .15s, transform .1s; }
+  .btn:active { transform: scale(.97); }
+  .btn-vert { background: var(--vert); color: #fff; }
+  .btn-vert:hover { opacity: .88; }
+  .btn-rouge { background: var(--rouge); color: #fff; }
+  .btn-rouge:hover { opacity: .88; }
+  .btn-gris { background: var(--gris-b); color: var(--texte); }
+  .btn-jaune { background: var(--jaune); color: #fff; }
+  .btn-sm { padding: 5px 12px; font-size: .8rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th { background: var(--vert); color: #fff; padding: 9px 10px; text-align: left; font-weight: 600; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--gris-b); vertical-align: top; }
+  tr:hover td { background: var(--gris); }
+  .tr-cliquable { cursor: pointer; }
+
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal { background: var(--blanc); border-radius: 14px; padding: 24px; width: 100%; max-width: 640px; box-shadow: 0 8px 32px rgba(0,0,0,.22); max-height: 90vh; overflow-y: auto; }
+  .modal h2 { color: var(--vert); margin-bottom: 16px; font-size: 1.05rem; }
+
+  .loader { text-align: center; padding: 40px; color: var(--vert-c); font-size: .95rem; }
+  .spinner { width: 36px; height: 36px; border: 4px solid var(--gris-b); border-top-color: var(--vert); border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .flex-end { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .gap-8 { gap: 8px; display: flex; flex-wrap: wrap; align-items: center; }
+  .mt-8 { margin-top: 8px; }
+  .mb-8 { margin-bottom: 8px; }
+  .mt-12 { margin-top: 12px; }
+  .mt-16 { margin-top: 16px; }
+  .alerte { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 8px 12px; font-size: .82rem; color: #856404; margin-bottom: 10px; }
+  .succes { background: #d8f3dc; border: 1px solid #40916c; border-radius: 8px; padding: 8px 12px; font-size: .82rem; color: #1b4332; }
+  .sep { border: none; border-top: 1px solid var(--gris-b); margin: 14px 0; }
+
+  /* Détail camion */
+  .detail-stat { display: inline-block; background: var(--gris); border-radius: 8px; padding: 8px 14px; margin: 4px; font-size: .85rem; }
+  .detail-stat b { color: var(--vert); font-size: 1.1rem; }
+
+  /* Gestion variétés */
+  .variete-tag { display: inline-flex; align-items: center; gap: 4px; background: var(--vert-l); border: 1px solid var(--vert-c); border-radius: 20px; padding: 3px 10px; font-size: .8rem; margin: 3px; }
+  .variete-tag button { border: none; background: none; cursor: pointer; color: var(--rouge); font-size: 1rem; line-height: 1; padding: 0; }
+
+  /* Palette row dans modal camion */
+  .pal-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--gris-b); font-size: .84rem; }
+  .pal-row:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+
+<!-- ÉCRAN DE CONNEXION -->
+<div id="login-screen">
+  <div class="login-box">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <h2>Gestion Stock Frigo</h2>
+    <p>Vergers – Accès sécurisé</p>
+    <input type="text" id="login-user" placeholder="Identifiant" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+    <input type="password" id="login-pass" placeholder="Mot de passe" autocomplete="current-password" onkeydown="if(event.key==='Enter')verifierConnexion()">
+    <span class="login-error" id="login-error">Identifiant ou mot de passe incorrect.</span>
+    <button onclick="verifierConnexion()">Se connecter</button>
+  </div>
+</div>
+
+<!-- PANNEAU ADMIN -->
+<div id="admin-panel">
+  <div class="admin-box">
+    <h3>⚙️ Gestion des accès</h3>
+    <div id="admin-user-list"></div>
+    <div class="add-user-form">
+      <h4>Ajouter un utilisateur</h4>
+      <input type="text" id="new-user-login" placeholder="Identifiant">
+      <input type="password" id="new-user-pass" placeholder="Mot de passe">
+      <label style="display:flex;align-items:center;gap:8px;font-size:.88rem;">
+        <input type="checkbox" id="new-user-admin"> Compte administrateur
+      </label>
+      <div class="admin-actions">
+        <button class="btn" onclick="adminAjouterUser()" style="background:var(--vert);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-weight:700;cursor:pointer;">Ajouter</button>
+        <button class="btn" onclick="fermerAdmin()" style="background:var(--gris-b);color:var(--texte);border:none;padding:9px 18px;border-radius:8px;font-weight:700;cursor:pointer;">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<header>
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+  <h1>Gestion Stock Frigo</h1>
+  <span><span class="dot-live"></span>Synchronisé en direct</span>
+  <span id="header-username" style="font-size:.82rem;opacity:.85;margin-left:auto;"></span>
+  <button class="btn-admin-open" id="btn-admin" onclick="ouvrirAdmin()" style="display:none;">⚙️ Admin</button>
+  <button class="btn-logout" onclick="seDeconnecter()">⎋ Déconnexion</button>
+</header>
+
+<nav>
+  <button class="active" onclick="afficherSection(&#39;frigo&#39;,this)">🧊 Frigo</button>
+  <button onclick="afficherSection(&#39;stock&#39;,this)">📦 Stock</button>
+  <button onclick="afficherSection(&#39;chargement&#39;,this)" class="">🚛 Préparation camion</button>
+  <button onclick="afficherSection(&#39;attente&#39;,this)">⏳ Camions en attente</button>
+  <button onclick="afficherSection(&#39;camions&#39;,this)">📋 Camions partis</button>
+  <button onclick="afficherSection(&#39;referentiels&#39;,this)">⚙️ Référentiels</button>
+</nav>
+
+<main>
+  <!-- ═══════ FRIGO ═══════ -->
+  <div id="sec-frigo" class="section active">
+    <div class="flex-between" style="margin-bottom:14px;">
+      <div class="gap-8" style="flex-wrap:wrap;">
+        <select id="filtre-espece" onchange="renderFrigo()" style="width:auto;">
+          <option value="">Toutes espèces</option>
+          <option>Pêche jaune</option><option>Pêche blanche</option>
+          <option>Nectarine jaune</option><option>Nectarine blanche</option>
+          <option>Abricot</option>
+        </select>
+        <select id="filtre-parcelle" onchange="renderFrigo()" style="width:auto;">
+          <option value="">Toutes parcelles</option>
+        </select>
+        <select id="filtre-variete" onchange="renderFrigo()" style="width:auto;">
+          <option value="">Toutes variétés</option>
+        </select>
+        <select id="filtre-tri" onchange="renderFrigo()" style="width:auto;">
+          <option value="creation">Trier par création (plus ancien en haut)</option>
+          <option value="date">Trier par date de récolte</option>
+          <option value="lot">Trier par n° de lot</option>
+          <option value="parcelle">Trier par parcelle</option>
+          <option value="variete">Trier par variété</option>
+        </select>
+      </div>
+      <button class="btn btn-vert gap-8" onclick="openModalLot()" style="display:flex;align-items:center;gap:6px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        Nouveau lot
+      </button>
+    </div>
+    <div id="frigo-content"><div class="alerte">Aucun lot en stock pour ce filtre.</div></div>
+  </div>
+
+
+  <!-- ═══════ STOCK ═══════ -->
+  <div id="sec-stock" class="section">
+    <div class="card">
+      <div class="card-title">📦 Inventaire du stock — par espèce</div>
+      <div id="stock-content"><div class="alerte">Chargement…</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════ PRÉPARATION CAMION ═══════ -->
+  <div id="sec-chargement" class="section">
+    <div class="card">
+      <div class="card-title">
+        🚛 Plan de chargement
+        <span id="nb-chargees" style="font-size:.78rem;font-weight:400;color:#777;margin-left:auto">13,20 m × 2,50 m — glissez les palettes ici, déplacez-les pour ajuster</span>
+      </div>
+      <div class="plan-camion-wrap">
+        <div class="plan-cabine" title="Cabine du tracteur">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="10" rx="1"></rect><circle cx="7" cy="18" r="1.5"></circle><circle cx="17" cy="18" r="1.5"></circle></svg>
+          <span>Cabine</span>
+        </div>
+        <div id="plan-camion" class="plan-camion" ondragover="event.preventDefault();this.classList.add(&#39;drag-over&#39;)" ondragleave="this.classList.remove(&#39;drag-over&#39;)" ondrop="dropPalette(event)"></div>
+      </div>
+      <div class="mt-8" style="font-size:.78rem;color:#777;">
+        <button class="btn btn-gris btn-sm" onclick="reorganiserPlan()">↻ Réorganiser automatiquement</button>
+        <span style="margin-left:8px;">Pivoter une palette : bouton ⤾ sur la palette dans le plan</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">📊 Occupation du camion</div>
+      <div class="mb-8">
+        <label>Nom du camion (optionnel)</label>
+        <input id="prep-nom" type="text" placeholder="Ex : Camion lundi matin, Rotation 1…" style="width:100%;">
+      </div>
+      <div id="jauge-zone">
+    <div class="jauge-label">Occupation : 0% (0 / 33 emplacements au sol)</div>
+    <div class="jauge-bar"><div class="jauge-fill " style="width:0%"></div></div>
+    <div class="jauge-text">
+      0 pal. 80×120 + 0 pal. 100×120 + 0 demi-palette(s)
+      — Capacité max : 33 emplacements (80×120) ou 26 (100×120)
+    </div></div>
+      <div class="mt-12 flex-end">
+        <button class="btn btn-gris" onclick="viderChargement()">Vider</button>
+        <button class="btn btn-vert" onclick="validerPreparation()">✔ Valider la préparation</button>
+      </div>
+    </div>
+    <div class="card mt-12">
+      <div class="card-title">🧊 Stock disponible — glisser vers le camion</div>
+      <div id="frigo-chargement"><div class="alerte">Toutes les palettes en stock sont déjà dans le chargement.</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════ CAMIONS EN ATTENTE ═══════ -->
+  <div id="sec-attente" class="section">
+    <div class="card">
+      <div class="card-title">⏳ Camions en préparation — à compléter avant départ</div>
+      <div id="attente-content"><div class="alerte">Aucun camion en préparation.</div></div>
+    </div>
+  </div>
+
+  <!-- ═══════ CAMIONS PARTIS ═══════ -->
+  <div id="sec-camions" class="section">
+    <div class="card">
+      <div class="card-title">🚛 Camions expédiés</div>
+      <div id="camions-content"><div style="overflow-x:auto"><table>
+    <thead><tr>
+      <th>Transporteur</th><th>Immat.</th><th>Arrivée</th><th>Départ</th>
+      <th>Palettes</th><th>Poids total</th><th>Commentaire</th><th></th>
+    </tr></thead><tbody>
+    <tr>
+        <td><b>Eurolopama</b></td>
+        <td>Augejz</td>
+        <td>12/06/2026 05:01</td>
+        <td>11/06/2026 18:01</td>
+        <td>2</td>
+        <td>900 kg</td>
+        <td style="font-size:.8rem">Mûr </td>
+        <td><button class="btn btn-vert btn-sm" onclick="ouvrirDetailCamion(&#39;10b4d1b1-b70c-4278-8adc-ebb984cec608&#39;)">Voir / Modifier</button></td>
+      </tr><tr>
+        <td><b>Air france</b></td>
+        <td>PD 666 PD</td>
+        <td>12/06/2026 23:40</td>
+        <td>12/06/2026 23:35</td>
+        <td>1</td>
+        <td>666 kg</td>
+        <td style="font-size:.8rem">Mange moi l'abricot mon salop</td>
+        <td><button class="btn btn-vert btn-sm" onclick="ouvrirDetailCamion(&#39;131c06cc-9e97-4981-8842-2d63fa1ac16f&#39;)">Voir / Modifier</button></td>
+      </tr><tr>
+        <td><b>Borgotransport</b></td>
+        <td>Moncul66</td>
+        <td>14/06/2026 00:22</td>
+        <td>12/06/2026 23:31</td>
+        <td>2</td>
+        <td>414 kg</td>
+        <td style="font-size:.8rem">Inshallah j'arrives</td>
+        <td><button class="btn btn-vert btn-sm" onclick="ouvrirDetailCamion(&#39;09894caf-0622-47a4-ab63-431779abbad9&#39;)">Voir / Modifier</button></td>
+      </tr><tr>
+        <td><b>EUROLOMA</b></td>
+        <td>—</td>
+        <td>13/06/2026 00:15</td>
+        <td>14/06/2026 00:16</td>
+        <td>8</td>
+        <td>3700 kg</td>
+        <td style="font-size:.8rem">—</td>
+        <td><button class="btn btn-vert btn-sm" onclick="ouvrirDetailCamion(&#39;f7cb21f5-189a-4251-8005-52e2f08e9aa4&#39;)">Voir / Modifier</button></td>
+      </tr><tr>
+        <td><b>EUROLOMA</b></td>
+        <td>azd-1234</td>
+        <td>12/06/2026 20:00</td>
+        <td>12/06/2026 20:00</td>
+        <td>0</td>
+        <td>0 kg</td>
+        <td style="font-size:.8rem">—</td>
+        <td><button class="btn btn-vert btn-sm" onclick="ouvrirDetailCamion(&#39;aa2eee2b-0d51-485f-9118-e1d1f620a199&#39;)">Voir / Modifier</button></td>
+      </tr><tr>
+        <td><b>euroloma</b></td>
+        <td>amd-1243</td>
+        <td>12/06/2026 20:00</td>
+        <td>12/06/2026 21:00</td>
+        <td>16</td>
+        <td>5803 kg</td>
+        <td style="font-size:.8rem">—</td>
+        <td><button class="btn btn-vert btn-sm" onclick="ouvrirDetailCamion(&#39;0a968da8-60d6-48a3-8d64-5c8dd4386811&#39;)">Voir / Modifier</button></td>
+      </tr>
+    </tbody></table></div></div>
+    </div>
+  </div>
+
+  <!-- ═══════ RÉFÉRENTIELS ═══════ -->
+  <div id="sec-referentiels" class="section">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" id="ref-grid">
+      <!-- Variétés par espèce -->
+      <div class="card" style="grid-column:1/-1">
+        <div class="card-title">🍑 Variétés par espèce</div>
+        <div id="ref-varietes-content"><div class="alerte">Chargement…</div></div>
+      </div>
+      <!-- Transporteurs -->
+      <div class="card">
+        <div class="card-title">🚛 Transporteurs</div>
+        <div id="ref-transp-content"><div class="alerte">Aucun transporteur enregistré.</div></div>
+        <div class="mt-8 gap-8">
+          <input id="new-transp" placeholder="Nouveau transporteur" style="flex:1;min-width:160px;">
+          <button class="btn btn-vert btn-sm" onclick="ajouterRef(&#39;transporteurs&#39;,&#39;new-transp&#39;)">Ajouter</button>
+        </div>
+      </div>
+      <!-- Immatriculations -->
+      <div class="card">
+        <div class="card-title">🔖 Immatriculations</div>
+        <div id="ref-immat-content"><div class="alerte">Aucune immatriculation enregistrée.</div></div>
+        <div class="mt-8 gap-8">
+          <input id="new-immat" placeholder="Nouvelle immatriculation" style="flex:1;min-width:160px;">
+          <button class="btn btn-vert btn-sm" onclick="ajouterRef(&#39;immatriculations&#39;,&#39;new-immat&#39;)">Ajouter</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ══════════════ MODAL NOUVEAU LOT ══════════════ -->
+<div id="modal-lot" class="modal-bg" style="display:none;" onclick="if(event.target===this)closeModalLot()">
+  <div class="modal">
+    <h2>➕ Nouveau lot</h2>
+    <div class="form-grid">
+      <!-- 1. Parcelle en premier : remplit espèce + variété automatiquement -->
+      <div style="grid-column:1/-1">
+        <label>Parcelle * <span id="nl-parcelle-status" style="font-weight:400;color:#888;font-size:.8rem;"></span></label>
+        <div class="combo-wrap">
+          <input id="nl-parcelle" placeholder="Tapez le code parcelle (ex: 1.01)…" autocomplete="off"
+            oninput="filtrerParcellesCombo('nl')"
+            onfocus="ouvrirComboParcel('nl')"
+            onblur="setTimeout(()=>fermerComboParcel('nl'),200)">
+          <div id="nl-parcelle-list" class="combo-list"></div>
+        </div>
+      </div>
+      <!-- 2. Espèce + Variété (remplis auto, verrouillés après choix parcelle) -->
+      <div>
+        <label>Espèce *</label>
+        <select id="nl-espece" onchange="chargerVarietesSelect()">
+          <option value="">— sélectionner une parcelle —</option>
+          <option value="Pêche jaune">Pêche jaune</option>
+          <option value="Pêche blanche">Pêche blanche</option>
+          <option value="Nectarine jaune">Nectarine jaune</option>
+          <option value="Nectarine blanche">Nectarine blanche</option>
+          <option value="Abricot">Abricot</option>
+        </select>
+      </div>
+      <div>
+        <label>Variété *</label>
+        <select id="nl-variete"><option value="">— sélectionner une parcelle —</option></select>
+      </div>
+      <!-- 3. N° Lot -->
+      <div><label>N° Lot *</label><input id="nl-num" placeholder="ex: 70450" oninput="mettreAJourNumerosPalettes()"></div>
+      <!-- 4. Date de récolte (aujourd'hui par défaut, modifiable) -->
+      <div><label>Date de récolte *</label><input id="nl-date" type="date"></div>
+    </div>
+    <hr class="sep">
+    <div class="flex-between">
+      <div class="card-title" style="margin-bottom:0;">Palettes</div>
+      <button class="btn btn-gris btn-sm" onclick="ajouterPaletteForm()">+ Palette</button>
+    </div>
+    <div id="palettes-form" class="mt-8"></div>
+    <div class="flex-end mt-12">
+      <button class="btn btn-gris" onclick="closeModalLot()">Annuler</button>
+      <button class="btn btn-vert" onclick="sauvegarderLot()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL DÉTAIL CAMION ══════════════ -->
+<div id="modal-camion" class="modal-bg" style="display:none;" onclick="if(event.target===this)closeModalCamion()">
+  <div class="modal" style="max-width:720px;">
+    <h2 id="mc-titre">Détail camion</h2>
+    <div id="mc-infos" class="form-grid" style="margin-bottom:14px;"></div>
+    <hr class="sep">
+    <div class="card-title" style="margin-bottom:8px;">📦 Résumé du chargement</div>
+    <div id="mc-stats" style="margin-bottom:12px;"></div>
+    <hr class="sep">
+    <div class="flex-between" style="margin-bottom:8px;">
+      <div class="card-title" style="margin-bottom:0;">🧱 Palettes dans ce camion</div>
+    </div>
+    <div id="mc-palettes"></div>
+    <hr class="sep">
+    <div class="card-title" style="margin-bottom:8px;">🧊 Ajouter depuis le stock</div>
+    <div id="mc-stock-dispo"></div>
+    <hr class="sep" id="mc-plan-sep" style="display:none;">
+    <div id="mc-plan-titre" class="card-title" style="margin-bottom:8px;display:none;">🚛 Plan de chargement <span style="font-size:.78rem;font-weight:400;color:#777;margin-left:auto">glissez les palettes pour ajuster</span></div>
+    <div id="mc-plan-wrap" class="plan-camion-wrap" style="display:none;">
+      <div class="plan-cabine" title="Cabine du tracteur">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="10" rx="1"></rect><circle cx="7" cy="18" r="1.5"></circle><circle cx="17" cy="18" r="1.5"></circle></svg>
+        <span>Cabine</span>
+      </div>
+      <div id="mc-plan" class="plan-camion"></div>
+    </div>
+    <div id="mc-plan-actions" class="mt-8" style="font-size:.78rem;color:#777;display:none;">
+      <button class="btn btn-gris btn-sm" onclick="reorganiserPlanModal()">↻ Réorganiser automatiquement</button>
+      <span style="margin-left:8px;">Pivoter une palette : bouton ⤾ · double-clic pour retirer du camion</span>
+    </div>
+    <div class="flex-end mt-12">
+      <button class="btn btn-gris" onclick="closeModalCamion()">Fermer</button>
+      <button class="btn btn-vert" onclick="sauvegarderModifCamion()">💾 Enregistrer les modifications</button>
+      <button class="btn btn-vert" id="mc-btn-parti" style="display:none;" onclick="marquerCamionParti()">🚛 Camion parti — sortir du stock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ MODAL ÉDITION LOT ══════════════ -->
+<div id="modal-edit-lot" class="modal-bg" style="display:none;" onclick="if(event.target===this)closeModalEditLot()">
+  <div class="modal">
+    <h2>✎ Modifier le lot</h2>
+    <div class="form-grid">
+      <div><label>N° Lot *</label><input id="el-num" placeholder="ex: 70450"></div>
+      <div>
+        <label>Parcelle *</label>
+        <div class="combo-wrap">
+          <input id="el-parcelle" placeholder="ex: 1.01" autocomplete="off" oninput="filtrerParcellesCombo('el')" onfocus="ouvrirComboParcel('el')" onblur="setTimeout(()=>fermerComboParcel('el'),180)">
+          <div id="el-parcelle-list" class="combo-list"></div>
+        </div>
+      </div>
+      <div>
+        <label>Espèce *</label>
+        <select id="el-espece" onchange="chargerVarietesSelectEdit()">
+          <option value="Pêche jaune">Pêche jaune</option>
+          <option value="Pêche blanche">Pêche blanche</option>
+          <option value="Nectarine jaune">Nectarine jaune</option>
+          <option value="Nectarine blanche">Nectarine blanche</option>
+          <option value="Abricot">Abricot</option>
+        </select>
+      </div>
+      <div>
+        <label>Variété *</label>
+        <select id="el-variete"><option value="">— choisir —</option></select>
+      </div>
+      <div><label>Date de récolte *</label><input id="el-date" type="date"></div>
+    </div>
+    <hr class="sep">
+    <div class="flex-between">
+      <div class="card-title" style="margin-bottom:0;">Palettes en stock</div>
+      <button class="btn btn-gris btn-sm" onclick="ajouterPaletteEditForm()">+ Palette</button>
+    </div>
+    <div id="palettes-edit-form" class="mt-8"></div>
+    <div class="alerte mt-8" id="el-info-partie" style="display:none;"></div>
+    <div class="flex-end mt-12">
+      <button class="btn btn-gris" onclick="closeModalEditLot()">Annuler</button>
+      <button class="btn btn-vert" onclick="sauvegarderEditLot()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+const SUPABASE_URL = 'https://vjptwetkczarxdfnrbiw.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqcHR3ZXRrY3phcnhkZm5yYml3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzk0NTUsImV4cCI6MjA5Njg1NTQ1NX0.d6TnwtMFmpU6wfuSJX9dadElfXl-6-q645bpQZz4M9E';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let lots = [], palettes = [], camions = [], parcelles = [];
+
+// ─── COMBOBOX PARCELLE ───
+// Retourne la parcelle correspondant à un code (insensible à la casse)
+function getParcelleByCode(code) {
+  if (!code) return null;
+  return parcelles.find(p =>
+    (p.code_parcelle || '').trim().toUpperCase() === code.trim().toUpperCase()
+  );
+}
+
+// Construit le label affiché dans la liste déroulante
+function labelParcelle(p) {
+  return `${p.code_parcelle} — ${p.espece} · ${p.variete}`;
+}
+
+// Ouvre la combo et affiche toutes les parcelles (ou filtre si texte saisi)
+function ouvrirComboParcel(prefix) {
+  const input = document.getElementById(prefix + '-parcelle');
+  const list  = document.getElementById(prefix + '-parcelle-list');
+  const q = input.value.trim().toLowerCase();
+  const source = q
+    ? parcelles.filter(p =>
+        (p.code_parcelle||'').toLowerCase().includes(q) ||
+        (p.espece||'').toLowerCase().includes(q) ||
+        (p.variete||'').toLowerCase().includes(q))
+    : parcelles;
+  list.innerHTML = source.length
+    ? source.map(p => `<div class="combo-item" onmousedown="selectionnerParcelle('${prefix}','${p.code_parcelle}')">${labelParcelle(p)}</div>`).join('')
+    : parcelles.length === 0
+      ? '<div class="combo-item" style="color:#e55;font-style:italic">⚠️ Aucune parcelle chargée (vérifie la RLS Supabase)</div>'
+      : '<div class="combo-item" style="color:#aaa;font-style:italic">Aucune correspondance</div>';
+  list.classList.add('open');
+}
+function fermerComboParcel(prefix) {
+  document.getElementById(prefix + '-parcelle-list').classList.remove('open');
+}
+
+// Filtre la liste selon ce qui est saisi
+function filtrerParcellesCombo(prefix) {
+  const input = document.getElementById(prefix + '-parcelle');
+  const list  = document.getElementById(prefix + '-parcelle-list');
+  const q = input.value.trim().toLowerCase();
+
+  // Si le champ est vidé → réactiver espèce + variété
+  if (!q) {
+    const especeSel = document.getElementById(prefix + '-espece');
+    const varSel    = document.getElementById(prefix + '-variete');
+    especeSel.disabled = false;
+    especeSel.value = '';
+    varSel.disabled = false;
+    if (prefix === 'nl') chargerVarietesSelect();
+    else chargerVarietesSelectEdit();
+    list.classList.remove('open');
+    return;
+  }
+
+  const filtered = parcelles.filter(p =>
+    (p.code_parcelle || '').toLowerCase().includes(q) ||
+    (p.espece || '').toLowerCase().includes(q) ||
+    (p.variete || '').toLowerCase().includes(q)
+  );
+  list.innerHTML = filtered.length
+    ? filtered.map(p => `<div class="combo-item" onmousedown="selectionnerParcelle('${prefix}','${p.code_parcelle}')">${labelParcelle(p)}</div>`).join('')
+    : '<div class="combo-item" style="color:#aaa;font-style:italic">Aucune parcelle trouvée</div>';
+  list.classList.add('open');
+}
+
+// Sélectionne une parcelle et remplit espèce + variété automatiquement
+function selectionnerParcelle(prefix, codeParcelle) {
+  const p = getParcelleByCode(codeParcelle);
+  if (!p) return;
+
+  document.getElementById(prefix + '-parcelle').value = p.code_parcelle;
+  fermerComboParcel(prefix);
+  if (prefix === 'nl') setTimeout(majFormatPalettes, 50);
+
+  // Espèce : correspondance entre les valeurs Supabase (majuscules) et l'app
+  const especeMap = {
+    'PECHE JAUNE':        'Pêche jaune',
+    'PÊCHE JAUNE':        'Pêche jaune',
+    'PECHE BLANCHE':      'Pêche blanche',
+    'PÊCHE BLANCHE':      'Pêche blanche',
+    'NECTARINE JAUNE':    'Nectarine jaune',
+    'NECTARINE BLANCHE':  'Nectarine blanche',
+    'ABRICOT':            'Abricot'
+  };
+  const especeRaw = (p.espece || '').toUpperCase().trim();
+  const especeVal = especeMap[especeRaw] || p.espece;
+
+  const especeSel = document.getElementById(prefix + '-espece');
+  especeSel.value = especeVal;
+  especeSel.disabled = true;
+
+  // Variété : valeur directe depuis Supabase
+  const varSel = document.getElementById(prefix + '-variete');
+  const varVal = (p.variete || '').trim();
+  varSel.innerHTML = `<option value="${varVal}" selected>${varVal}</option>`;
+  varSel.disabled = true;
+}
+
+// Réactive les champs si l'utilisateur efface la parcelle manuellement
+function reinitialiserParcelleAuto(prefix) {
+  const especeSel = document.getElementById(prefix + '-espece');
+  const varSel    = document.getElementById(prefix + '-variete');
+  especeSel.disabled = false;
+  varSel.disabled    = false;
+}
+let palettesDansCamion = [];
+let camionEnEdition = null; // pour modal détail camion
+let palettesAjoutees = []; // ajouts dans modal édition camion
+let palettesRetirees = []; // retraits dans modal édition camion
+
+// ─── RÉFÉRENTIELS (localStorage) ───
+const VARIETES_DEFAULT = {
+  'Pêche jaune':      ['Dixired','Redhaven','Flavorcrest','Elegant Lady','O\'Henry','Baby Gold','Suncrest'],
+  'Pêche blanche':    ['Andross','Benedicte','Magique','Maria Blanca','Weeping blanc'],
+  'Nectarine jaune':  ['Big Top','Fantasia','Flame Red','Firebrite','Honey Blaze','Summer Fire'],
+  'Nectarine blanche':['Vermeil','Snow Queen','Arctic Rose','Jade','Silver Gem'],
+  'Abricot':          ['Bergeron','Orangered','Harogem','Goldrich','Hargrand','Farbela','Farlis']
+};
+
+function getRef(cle) {
+  try { return JSON.parse(localStorage.getItem('ref_' + cle) || 'null'); } catch { return null; }
+}
+function setRef(cle, val) { localStorage.setItem('ref_' + cle, JSON.stringify(val)); }
+
+function getVarietes() { return getRef('varietes') || JSON.parse(JSON.stringify(VARIETES_DEFAULT)); }
+
+// Variétés tirées de la table parcelles Supabase (par espèce normalisée)
+function normaliserEspece(raw) {
+  const map = {
+    'PECHE JAUNE':'Pêche jaune','PÊCHE JAUNE':'Pêche jaune',
+    'PECHE BLANCHE':'Pêche blanche','PÊCHE BLANCHE':'Pêche blanche',
+    'NECTARINE JAUNE':'Nectarine jaune','NECTARINE BLANCHE':'Nectarine blanche',
+    'ABRICOT':'Abricot'
+  };
+  return map[(raw||'').toUpperCase().trim()] || raw;
+}
+function getVarietesParcelles(espece) {
+  return [...new Set(
+    parcelles
+      .filter(p => normaliserEspece(p.espece) === espece)
+      .map(p => (p.variete||'').trim())
+      .filter(Boolean)
+  )].sort();
+}
+function getEspecesParcelles() {
+  return [...new Set(parcelles.map(p => normaliserEspece(p.espece)).filter(Boolean))].sort();
+}
+function populerEspecesSelect(selectId, valeurActuelle) {
+  const especes = getEspecesParcelles();
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— sélectionner —</option>' +
+    especes.map(e => `<option value="${e}">${e}</option>`).join('');
+  if (valeurActuelle && especes.includes(valeurActuelle)) sel.value = valeurActuelle;
+}
+function getTransporteurs() { return getRef('transporteurs') || []; }
+function getImmatriculations() { return getRef('immatriculations') || []; }
+
+// ─── INIT ───
+async function init() {
+  await chargerDonnees();
+  renderFrigo();
+  renderStock();
+  renderFrigoChargement();
+  renderJauge();
+  renderPlanCamion();
+  renderCamions();
+  renderCamionsAttente();
+  renderReferentiels();
+  abonnements();
+}
+
+async function chargerDonnees() {
+  const [rL, rP, rC, rPar] = await Promise.all([
+    sb.from('lots').select('*').order('created_at', { ascending: true }),
+    sb.from('palettes').select('*').order('created_at', { ascending: true }),
+    sb.from('camions').select('*').order('created_at', { ascending: false }),
+    sb.from('parcelles').select('*').order('code_parcelle', { ascending: true })
+  ]);
+
+  lots = rL.data || [];
+  palettes = rP.data || [];
+  camions = rC.data || [];
+  parcelles = rPar.data || [];
+
+  // Debug : log en console si la table colis est vide ou en erreur
+  if (rPar.error) console.error('Erreur chargement table colis :', rPar.error);
+  else console.log(`✅ ${parcelles.length} parcelle(s) chargée(s) depuis la table colis`);
+}
+
+function abonnements() {
+  sb.channel('realtime-all')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'lots' }, async () => { await chargerDonnees(); renderFrigo(); renderFrigoChargement(); renderReferentiels(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'palettes' }, async () => { await chargerDonnees(); renderFrigo(); renderFrigoChargement(); renderJauge(); renderCamionsAttente(); })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'camions' }, async () => { await chargerDonnees(); renderCamions(); renderCamionsAttente(); })
+    .subscribe();
+}
+
+// ─── NAV ───
+function afficherSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id === 'stock') renderStock();
+  if (id === 'chargement') { renderFrigoChargement(); renderJauge(); renderPlanCamion(); }
+  if (id === 'attente') renderCamionsAttente();
+  if (id === 'referentiels') renderReferentiels();
+}
+
+// ─── BADGES ───
+function badgeEspece(espece) {
+  const map = { 'Pêche jaune':'badge-pj','Pêche blanche':'badge-pb','Nectarine jaune':'badge-nj','Nectarine blanche':'badge-nb','Abricot':'badge-ab' };
+  return `<span class="badge ${map[espece]||''}">${espece}</span>`;
+}
+
+// ─── FRIGO ───
+function renderFrigo() {
+  const filtreEspece = document.getElementById('filtre-espece').value;
+  const filtreParcelle = document.getElementById('filtre-parcelle').value;
+  const filtreVariete = document.getElementById('filtre-variete').value;
+  const tri = document.getElementById('filtre-tri').value;
+
+  // Lots en stock (au moins une palette en stock)
+  const lotsEnStock = lots.filter(l => palettes.some(p => p.lot_id === l.id && p.statut === 'stock'));
+
+  // Remplir les filtres parcelle / variété dynamiquement
+  remplirOptions('filtre-parcelle', [...new Set(lotsEnStock.map(l => l.parcelle))].sort(), filtreParcelle);
+  remplirOptions('filtre-variete', [...new Set(lotsEnStock.map(l => l.variete))].sort(), filtreVariete);
+
+  let lotsAff = lotsEnStock.filter(l =>
+    (!filtreEspece || l.espece === filtreEspece) &&
+    (!filtreParcelle || l.parcelle === filtreParcelle) &&
+    (!filtreVariete || l.variete === filtreVariete)
+  );
+
+  if (tri === 'date') lotsAff.sort((a,b) => new Date(a.date_recolte) - new Date(b.date_recolte));
+  else if (tri === 'lot') lotsAff.sort((a,b) => a.numero_lot.localeCompare(b.numero_lot));
+  else if (tri === 'parcelle') lotsAff.sort((a,b) => a.parcelle.localeCompare(b.parcelle));
+  else if (tri === 'variete') lotsAff.sort((a,b) => a.variete.localeCompare(b.variete));
+  // 'creation' : ordre déjà fourni par chargerDonnees (created_at ascending, plus ancien en haut)
+
+  const el = document.getElementById('frigo-content');
+  if (!lotsAff.length) { el.innerHTML = '<div class="alerte">Aucun lot en stock pour ce filtre.</div>'; return; }
+
+  el.innerHTML = lotsAff.map(lot => {
+    const pals = palettes.filter(p => p.lot_id === lot.id && p.statut === 'stock');
+    const palsAff = [...pals].reverse(); // dernière palette ajoutée en haut
+    const poids = pals.reduce((s,p) => s + (p.poids_kg||0), 0);
+    return `<div class="lot-bloc collapsed" data-lot="${lot.id}">
+      <div class="lot-header" onclick="toggleLot(this)">
+        <span class="lot-num">${lot.numero_lot}</span>
+        ${badgeEspece(lot.espece)}
+        <span class="badge" style="background:var(--gris);color:#444">${lot.variete}</span>
+        <span class="lot-info">📍 ${lot.parcelle} · 📅 ${fmt(lot.date_recolte)}</span>
+        <span class="lot-info"><b>${pals.length}</b> pal. · <b>${Math.round(poids)}</b> kg</span>
+        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
+      <div class="lot-body">
+        <div class="palettes-grid">
+          ${palsAff.map(p => renderPaletteCard(p)).join('')}
+        </div>
+        <div class="flex-end mt-12">
+          <button class="btn btn-gris btn-sm" onclick="event.stopPropagation();openModalEditLot('${lot.id}')">✎ Modifier ce lot</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+
+// ─── STOCK ───
+function renderStock() {
+  const el = document.getElementById('stock-content');
+  if (!el) return;
+
+  // Uniquement les palettes en stock
+  const palsStock = palettes.filter(p => p.statut === 'stock');
+  if (!palsStock.length) {
+    el.innerHTML = '<div class="alerte">Aucune palette en stock.</div>';
+    return;
+  }
+
+  // Regrouper par espèce puis variété
+  const parEspece = {};
+  palsStock.forEach(pal => {
+    const lot = lots.find(l => l.id === pal.lot_id);
+    if (!lot) return;
+    const esp = lot.espece || '—';
+    const vari = lot.variete || '—';
+    if (!parEspece[esp]) parEspece[esp] = { nb: 0, poids: 0, varietes: {} };
+    parEspece[esp].nb++;
+    parEspece[esp].poids += pal.poids_kg || 0;
+    if (!parEspece[esp].varietes[vari]) parEspece[esp].varietes[vari] = { nb: 0, poids: 0 };
+    parEspece[esp].varietes[vari].nb++;
+    parEspece[esp].varietes[vari].poids += pal.poids_kg || 0;
+  });
+
+  const totalPals = palsStock.length;
+  const totalPoids = palsStock.reduce((s, p) => s + (p.poids_kg || 0), 0);
+
+  el.innerHTML = `
+    <table style="margin-bottom:12px;">
+      <thead><tr>
+        <th style="width:32px;"></th>
+        <th>Espèce / Variété</th>
+        <th style="text-align:right;">Palettes</th>
+        <th style="text-align:right;">Poids total</th>
+        <th style="text-align:right;">% du stock</th>
+      </tr></thead>
+      <tbody>
+        ${Object.entries(parEspece).map(([esp, data], idx) => {
+          const pct = Math.round((data.nb / totalPals) * 100);
+          const varRows = Object.entries(data.varietes).map(([vari, vdata]) => `
+            <tr class="stock-variete-row" id="stock-var-${idx}" style="display:none;background:var(--gris);">
+              <td></td>
+              <td style="padding-left:28px;font-size:.83rem;color:#555;">↳ ${vari}</td>
+              <td style="text-align:right;font-size:.83rem;">${vdata.nb}</td>
+              <td style="text-align:right;font-size:.83rem;">${Math.round(vdata.poids)} kg</td>
+              <td style="text-align:right;font-size:.83rem;">${Math.round((vdata.nb/totalPals)*100)}%</td>
+            </tr>`).join('');
+          return `
+            <tr class="tr-cliquable stock-espece-row" onclick="toggleStockEspece(${idx})" style="font-weight:600;">
+              <td style="text-align:center;color:var(--vert-c);font-size:.9rem;" id="stock-chevron-${idx}">▶</td>
+              <td>${badgeEspece(esp)}</td>
+              <td style="text-align:right;">${data.nb}</td>
+              <td style="text-align:right;">${Math.round(data.poids)} kg</td>
+              <td style="text-align:right;">${pct}%</td>
+            </tr>
+            ${varRows}`;
+        }).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:700;border-top:2px solid var(--gris-b);">
+          <td></td>
+          <td>Total</td>
+          <td style="text-align:right;">${totalPals}</td>
+          <td style="text-align:right;">${Math.round(totalPoids)} kg</td>
+          <td style="text-align:right;">100%</td>
+        </tr>
+      </tfoot>
+    </table>`;
+}
+
+function toggleStockEspece(idx) {
+  const rows = document.querySelectorAll(`#stock-var-${idx}`);
+  const chevron = document.getElementById(`stock-chevron-${idx}`);
+  const isOpen = chevron.textContent === '▼';
+  rows.forEach(r => r.style.display = isOpen ? 'none' : '');
+  chevron.textContent = isOpen ? '▶' : '▼';
+}
+
+function remplirOptions(selectId, valeurs, valeurCourante) {
+  const sel = document.getElementById(selectId);
+  const placeholder = sel.options[0];
+  sel.innerHTML = '';
+  sel.appendChild(placeholder);
+  valeurs.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    sel.appendChild(opt);
+  });
+  if (valeurs.includes(valeurCourante)) sel.value = valeurCourante;
+}
+
+function renderPaletteCard(p, extraAttrs) {
+  const isDemi = p.format === 'demi';
+  return `
+    <div class="palette-card ${p.format==='100x120'?'format-100':isDemi?'format-demi':''}" draggable="true" ondragstart="dragStart(event,'${p.id}')" ondblclick="ajouterPaletteAuCamion('${p.id}')" title="Glisser ou double-cliquer pour ajouter au camion" ${extraAttrs||''}>
+      ${isDemi ? '<div class="demi-stack"><span></span><span></span></div>' : ''}
+      <div class="pal-num">${p.numero_palette}${p.format==='demi'?' <span style="font-size:.7em;color:#9061f9;font-weight:700;">½</span>':''}</div>
+      <div class="pal-poids">${fmtFormat(p.format)} · ${p.poids_kg||0} kg</div>
+      <button class="btn-ajout-mobile" onclick="ajouterPaletteAuCamion('${p.id}')">+ Camion</button>
+    </div>`;
+}
+
+function toggleLot(headerEl) {
+  headerEl.closest('.lot-bloc').classList.toggle('collapsed');
+}
+
+function fmtFormat(f) {
+  if (f === '100x120') return '100×120';
+  if (f === '80x120') return '80×120';
+  if (f === 'demi') return 'Demi-palette';
+  return f;
+}
+
+function renderFrigoChargement() {
+  const el = document.getElementById('frigo-chargement');
+  const lotsAff = lots.filter(l =>
+    palettes.some(p => p.lot_id === l.id && p.statut === 'stock' && !palettesDansCamion.find(x => x.id === p.id))
+  );
+  if (!lotsAff.length) { el.innerHTML = '<div class="alerte">Toutes les palettes en stock sont déjà dans le chargement.</div>'; return; }
+  el.innerHTML = lotsAff.map(lot => {
+    const pals = palettes.filter(p => p.lot_id === lot.id && p.statut === 'stock' && !palettesDansCamion.find(x => x.id === p.id));
+    if (!pals.length) return '';
+    const palsAff = [...pals].reverse();
+    return `<div class="lot-bloc" style="margin-bottom:8px;">
+      <div class="lot-header" style="cursor:default;">
+        <span class="lot-num">${lot.numero_lot}</span>${badgeEspece(lot.espece)}
+        <span class="lot-info">📍 ${lot.parcelle} · 📅 ${fmt(lot.date_recolte)}</span>
+      </div>
+      <div class="palettes-grid">
+        ${palsAff.map(p => renderPaletteCard(p)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── DRAG & DROP (depuis le stock) ───
+let dragId = null;
+function dragStart(e, id) { dragId = id; e.dataTransfer.effectAllowed = 'move'; }
+
+function ajouterPaletteAuCamion(id) {
+  const pal = palettes.find(p => p.id === id);
+  if (!pal || palettesDansCamion.find(p => p.id === id)) return;
+  pal._pos = null;
+  palettesDansCamion.push(pal);
+  placerNouvellesPalettes([pal]);
+  rafraichirChargement();
+}
+
+function dropPalette(e) {
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  if (!dragId) return;
+  const pal = palettes.find(p => p.id === dragId);
+  if (!pal || palettesDansCamion.find(p => p.id === dragId)) return;
+  pal._pos = null;
+  palettesDansCamion.push(pal); dragId = null;
+  placerNouvellesPalettes([pal]);
+  rafraichirChargement();
+}
+
+function retirerPalette(id) {
+  palettesDansCamion = palettesDansCamion.filter(p => p.id !== id);
+  rafraichirChargement();
+}
+
+function rafraichirChargement() {
+  renderFrigoChargement(); renderJauge(); renderPlanCamion();
+}
+
+// ─── PLAN DE CHARGEMENT 2D ───
+const TRUCK_L = 1320; // cm, longueur
+const TRUCK_W = 250;  // cm, largeur
+const GRID = 5;       // résolution de la grille d'occupation, en cm
+const GRID_COLS = TRUCK_L / GRID; // 264
+const GRID_ROWS = TRUCK_W / GRID; // 50
+
+// Construit les "unités de plancher" à partir des palettes (les demi-palettes sont appariées par 2)
+function construireUnites(pals) {
+  const unites = [];
+  const demis = pals.filter(p => p.format === 'demi');
+  const autres = pals.filter(p => p.format !== 'demi');
+
+  autres.forEach(p => {
+    if (p.format === '100x120') unites.push({ w: 125, l: 120, pals: [p], type: '100x120' });
+    else unites.push({ w: 80, l: 120, pals: [p], type: '80x120', rotation: p.rotation || 0 });
+  });
+
+  // Appairer les demi-palettes par 2 (empilées) -> occupent une place 80x120
+  for (let i = 0; i < demis.length; i += 2) {
+    const paire = demis.slice(i, i + 2);
+    unites.push({ w: 80, l: 120, pals: paire, type: 'demi', rotation: paire[0].rotation || 0 });
+  }
+  return unites;
+}
+
+function dimsUnite(u) {
+  // rotation 90 = on échange largeur/longueur de l'unité
+  if (u.rotation === 90) return { w: u.l, l: u.w };
+  return { w: u.w, l: u.l };
+}
+
+// Grille d'occupation : marque les cellules occupées par les unités déjà positionnées (_pos défini)
+function construireGrille(unitesAvecPos) {
+  const grille = new Uint8Array(GRID_COLS * GRID_ROWS);
+  unitesAvecPos.forEach(u => {
+    const p = u.pals[0]._pos;
+    const cx0 = Math.round(p.x / GRID), cy0 = Math.round(p.y / GRID);
+    const cw = Math.round(p.l / GRID), ch = Math.round(p.w / GRID);
+    for (let cy = cy0; cy < cy0 + ch && cy < GRID_ROWS; cy++) {
+      for (let cx = cx0; cx < cx0 + cw && cx < GRID_COLS; cx++) {
+        if (cx >= 0 && cy >= 0) grille[cy * GRID_COLS + cx] = 1;
+      }
+    }
+  });
+  return grille;
+}
+
+function zoneLibre(grille, cx0, cy0, cw, ch) {
+  if (cx0 + cw > GRID_COLS || cy0 + ch > GRID_ROWS) return false;
+  for (let cy = cy0; cy < cy0 + ch; cy++) {
+    for (let cx = cx0; cx < cx0 + cw; cx++) {
+      if (grille[cy * GRID_COLS + cx]) return false;
+    }
+  }
+  return true;
+}
+
+function marquerZone(grille, cx0, cy0, cw, ch) {
+  for (let cy = cy0; cy < cy0 + ch; cy++) {
+    for (let cx = cx0; cx < cx0 + cw; cx++) {
+      grille[cy * GRID_COLS + cx] = 1;
+    }
+  }
+}
+
+// Place une unité dans la première zone libre trouvée (balayage par colonnes puis lignes),
+// en essayant l'orientation courante puis l'orientation alternative si besoin.
+function placerUnite(grille, u) {
+  const orientations = u.type === '100x120' ? [0] : [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
+  for (const rot of orientations) {
+    const dims = dimsUnite({ ...u, rotation: rot });
+    const cw = Math.round(dims.l / GRID), ch = Math.round(dims.w / GRID);
+    for (let cx = 0; cx <= GRID_COLS - cw; cx++) {
+      for (let cy = 0; cy <= GRID_ROWS - ch; cy++) {
+        if (zoneLibre(grille, cx, cy, cw, ch)) {
+          marquerZone(grille, cx, cy, cw, ch);
+          u.rotation = rot;
+          u.pals.forEach(p => {
+            p.rotation = rot;
+            p._pos = { x: cx * GRID, y: cy * GRID, w: dims.w, l: dims.l, rotation: rot, type: u.type };
+          });
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// Place une unité en partant du bas du camion vers le haut, et de gauche à droite
+// (utilisé quand on ajoute une nouvelle palette par double-clic ou glisser-déposer).
+function placerUniteBasHaut(grille, u) {
+  const orientations = u.type === '100x120' ? [0] : [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
+  for (const rot of orientations) {
+    const dims = dimsUnite({ ...u, rotation: rot });
+    const cw = Math.round(dims.l / GRID), ch = Math.round(dims.w / GRID);
+    for (let cx = 0; cx <= GRID_COLS - cw; cx++) {
+      for (let cy = GRID_ROWS - ch; cy >= 0; cy--) {
+        if (zoneLibre(grille, cx, cy, cw, ch)) {
+          marquerZone(grille, cx, cy, cw, ch);
+          u.rotation = rot;
+          u.pals.forEach(p => {
+            p.rotation = rot;
+            p._pos = { x: cx * GRID, y: cy * GRID, w: dims.w, l: dims.l, rotation: rot, type: u.type };
+          });
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// Ajoute une/des palettes au plan en les plaçant du bas vers le haut, de gauche à droite,
+// sans déplacer les palettes déjà positionnées.
+function placerNouvellesPalettes(nouvelles) {
+  const avecPosition = palettesDansCamion.filter(p => p._pos && !nouvelles.includes(p));
+  const unitesFixes = construireUnites(avecPosition).filter(u => u.pals.every(p => p._pos));
+  const grille = construireGrille(unitesFixes);
+  const unites = construireUnites(nouvelles);
+  unites.forEach(u => placerUniteBasHaut(grille, u));
+}
+
+// Réorganise : conserve les palettes placées manuellement (marquées _manual), et replace
+// les autres autour d'elles en comblant les emplacements libres.
+function reorganiserPlan() {
+  palettesDansCamion.forEach(p => { if (!p._manual) p._pos = null; });
+  autoPlacerManquantesCtx(palettesDansCamion);
+  rafraichirChargement();
+}
+
+// Réorganise le plan d'un camion édité dans le modal (Camions en attente)
+function reorganiserPlanModal() {
+  const pals = palsModalActuelles();
+  pals.forEach(p => { if (!p._manual) p._pos = null; });
+  autoPlacerManquantesCtx(pals);
+  renderModalCamion();
+}
+
+function autoPlacerManquantesCtx(pals) {
+  const avecPosition = pals.filter(p => p._pos);
+  const sansPosition = pals.filter(p => !p._pos);
+  const unitesFixes = construireUnites(avecPosition).filter(u => u.pals.every(p => p._pos));
+  const grille = construireGrille(unitesFixes);
+  const unites = construireUnites(sansPosition);
+  unites.forEach(u => placerUnite(grille, u));
+}
+
+// Pivote une seule palette (ou la paire de demi-palettes auxquelles elle appartient)
+function pivoterPalette(palId) {
+  pivoterPaletteCtx(palId, palettesDansCamion);
+  rafraichirChargement();
+}
+function pivoterPaletteModal(palId) {
+  pivoterPaletteCtx(palId, palsModalActuelles());
+  renderModalCamion();
+}
+function pivoterPaletteCtx(palId, pals) {
+  const pal = pals.find(p => p.id === palId);
+  if (!pal || pal.format === '100x120') return;
+  // Regrouper la palette avec son éventuelle paire de demi-palette pour la faire pivoter ensemble
+  let groupe = [pal];
+  if (pal.format === 'demi') {
+    const demis = pals.filter(p => p.format === 'demi');
+    const idx = demis.indexOf(pal);
+    const partenaire = idx % 2 === 0 ? demis[idx + 1] : demis[idx - 1];
+    if (partenaire) groupe.push(partenaire);
+  }
+  const newRot = (pal.rotation === 90) ? 0 : 90;
+  groupe.forEach(p => { p.rotation = newRot; p._pos = null; p._manual = false; });
+  autoPlacerManquantesCtx(pals);
+}
+
+function renderPlanCamion() {
+  const el = document.getElementById('plan-camion');
+  const nb = document.getElementById('nb-chargees');
+  if (!el) return;
+  autoPlacerManquantesCtx(palettesDansCamion);
+
+  if (nb) nb.textContent = palettesDansCamion.length
+    ? `13,20 m × 2,50 m — ${palettesDansCamion.length} palette(s) — glissez pour ajuster`
+    : '13,20 m × 2,50 m — glissez des palettes ici';
+
+  renderPlanInto('plan-camion', palettesDansCamion, {
+    onDblClickPal: 'retirerPalette',
+    onRotate: 'pivoterPalette',
+    dragCtx: 'principal'
+  });
+}
+
+// Affiche le plan 2D dans l'élément ciblé, pour un tableau de palettes donné.
+// opts.onDblClickPal / opts.onRotate : noms des fonctions globales à appeler (chaînes, pour l'attribut onclick)
+// opts.dragCtx : 'principal' ou 'modal' — contrôle quel tableau de palettes le drag manipule
+function renderPlanInto(elId, pals, opts) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!pals.length) {
+    el.innerHTML = '<div class="empty-msg" style="padding-top:30%">Glissez des palettes depuis le stock ci-dessous</div>';
+    return;
+  }
+  el.innerHTML = pals.map(p => {
+    const pos = p._pos;
+    if (!pos) return '';
+    const lot = lots.find(l => l.id === p.lot_id);
+    const cls = p.format === '100x120' ? 'format-100' : p.format === 'demi' ? 'format-demi' : '';
+    const xPct = (pos.x / TRUCK_L) * 100;
+    const yPct = (pos.y / TRUCK_W) * 100;
+    const wPct = (pos.l / TRUCK_L) * 100;
+    const hPct = (pos.w / TRUCK_W) * 100;
+    const dblClick = opts.onDblClickPal ? `ondblclick="${opts.onDblClickPal}('${p.id}')"` : '';
+    const rotateBtn = opts.onRotate
+      ? `<button class="pp-rotate" title="Pivoter cette palette" onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();${opts.onRotate}('${p.id}')">⤾</button>`
+      : '';
+    return `<div class="plan-pal ${cls}" data-pal="${p.id}"
+        style="left:${xPct}%;top:${yPct}%;width:${wPct}%;height:${hPct}%;"
+        onpointerdown="planDragStart(event,'${p.id}','${elId}','${opts.dragCtx}')" ${dblClick} title="Glisser pour ajuster${opts.onDblClickPal?' · double-clic pour retirer':''}">
+      ${rotateBtn}
+      <span class="pp-num">${p.numero_palette}</span>
+      <span class="pp-sub">${lot?lot.numero_lot:''} · ${fmtFormat(p.format)}</span>
+    </div>`;
+  }).join('') + `<div class="plan-legende" style="position:absolute;bottom:2px;left:4px;right:4px;"></div>`;
+}
+
+// Glisser-déposer manuel sur le plan
+let planDrag = null;
+function planDragStart(e, palId, elId, ctx) {
+  e.preventDefault();
+  const el = document.getElementById(elId);
+  const rect = el.getBoundingClientRect();
+  const pals = ctx === 'modal' ? palsModalActuelles() : palettesDansCamion;
+  const pal = pals.find(p => p.id === palId);
+  const target = e.currentTarget;
+  planDrag = { palId, rect, pal, pals, ctx, target, startX: e.clientX, startY: e.clientY, moved: false };
+  document.addEventListener('pointermove', planDragMove);
+  document.addEventListener('pointerup', planDragEnd);
+}
+function planDragMove(e) {
+  if (!planDrag) return;
+  const { rect, target, ctx } = planDrag;
+  if (!planDrag.moved) {
+    // Ignore les micro-mouvements (clic / double-clic) : on ne démarre le drag
+    // que si le pointeur s'est réellement déplacé.
+    if (Math.abs(e.clientX - planDrag.startX) < 4 && Math.abs(e.clientY - planDrag.startY) < 4) return;
+    planDrag.moved = true;
+    target.classList.add('dragging');
+  }
+  // En mode modal, on ne permet pas de sortir la palette en glissant hors du plan
+  const outside = ctx !== 'modal' && (e.clientX < rect.left - 20 || e.clientX > rect.right + 20 ||
+                   e.clientY < rect.top - 20 || e.clientY > rect.bottom + 20);
+  target.classList.toggle('removing', outside);
+  if (outside) return;
+  let xPct = ((e.clientX - rect.left) / rect.width) * 100;
+  let yPct = ((e.clientY - rect.top) / rect.height) * 100;
+  xPct = Math.max(0, Math.min(100, xPct));
+  yPct = Math.max(0, Math.min(100, yPct));
+  target.style.left = xPct + '%';
+  target.style.top = yPct + '%';
+}
+function planDragEnd(e) {
+  if (!planDrag) return;
+  const { rect, pal, pals, ctx, target, moved } = planDrag;
+  document.removeEventListener('pointermove', planDragMove);
+  document.removeEventListener('pointerup', planDragEnd);
+  planDrag = null;
+
+  if (!moved) return; // simple clic / double-clic : pas de déplacement
+
+  // Si relâché en dehors du plan (avec marge), on retire la palette (sauf en mode modal)
+  const outside = ctx !== 'modal' && (e.clientX < rect.left - 20 || e.clientX > rect.right + 20 ||
+                   e.clientY < rect.top - 20 || e.clientY > rect.bottom + 20);
+  if (outside) {
+    retirerPalette(pal.id);
+    return;
+  }
+
+  let xPct = ((e.clientX - rect.left) / rect.width) * 100;
+  let yPct = ((e.clientY - rect.top) / rect.height) * 100;
+  xPct = Math.max(0, Math.min(100, xPct));
+  yPct = Math.max(0, Math.min(100, yPct));
+  let xCm = (xPct / 100) * TRUCK_L;
+  let yCm = (yPct / 100) * TRUCK_W;
+  // Grille de 5cm + bornes
+  xCm = Math.max(0, Math.min(TRUCK_L - pal._pos.l, Math.round(xCm / GRID) * GRID));
+  yCm = Math.max(0, Math.min(TRUCK_W - pal._pos.w, Math.round(yCm / GRID) * GRID));
+  pal._pos = { ...pal._pos, x: xCm, y: yCm };
+  pal._manual = true;
+  // Si c'est une demi-palette, sa partenaire (empilée) suit la même position
+  if (pal.format === 'demi') {
+    const demis = pals.filter(p => p.format === 'demi');
+    const idx = demis.indexOf(pal);
+    const partenaire = idx % 2 === 0 ? demis[idx + 1] : demis[idx - 1];
+    if (partenaire) { partenaire._pos = { ...pal._pos }; partenaire._manual = true; }
+  }
+  target.classList.remove('dragging', 'removing');
+  if (ctx === 'modal') renderModalCamion();
+  else { renderPlanCamion(); renderJauge(); }
+}
+
+// ─── JAUGE (basée sur les emplacements au sol réellement occupés) ───
+function calcEquiv(pals) {
+  const unites = construireUnites(pals);
+  let totalL = 0, curY = 0, rowLen = 0, i = 0;
+  // simulation du même algorithme de placement pour connaître la longueur totale occupée
+  while (i < unites.length) {
+    curY = 0; rowLen = 0;
+    let placed = false;
+    while (i < unites.length) {
+      const dims = dimsUnite(unites[i]);
+      if (curY + dims.w > TRUCK_W + 0.01) break;
+      curY += dims.w; rowLen = Math.max(rowLen, dims.l); i++; placed = true;
+    }
+    if (!placed) break;
+    totalL += rowLen;
+  }
+  return totalL / TRUCK_L * 33; // équivalent en "emplacements 80x120" (33 = capacité max pure 80x120)
+}
+function renderJauge() {
+  const nbPaires80 = construireUnites(palettesDansCamion).length;
+  const equiv = calcEquiv(palettesDansCamion);
+  const pct = Math.min(100, Math.round((equiv / 33) * 100));
+  const restant = Math.max(0, 33 - equiv).toFixed(1);
+  const cls = pct >= 100 ? 'plein' : pct >= 85 ? 'presque' : '';
+  const nbDemi = palettesDansCamion.filter(p=>p.format==='demi').length;
+  document.getElementById('jauge-zone').innerHTML = `
+    <div class="jauge-label">Occupation : ${pct}% (${nbPaires80} emplacement(s) au sol sur 33 max)</div>
+    <div class="jauge-bar"><div class="jauge-fill ${cls}" style="width:${pct}%"></div></div>
+    <div class="jauge-text">
+      ${palettesDansCamion.filter(p=>p.format==='80x120').length} pal. 80×120 +
+      ${palettesDansCamion.filter(p=>p.format==='100x120').length} pal. 100×120
+      ${nbDemi ? `+ ${nbDemi} demi-palette(s)` : ''}
+      — ≈ ${restant} emplacement(s) 80×120 restants — Capacité max : 33 (80×120) / 26 (100×120)
+    </div>`;
+}
+
+// ─── VALIDER PRÉPARATION ───
+async function validerPreparation() {
+  if (!palettesDansCamion.length) { alert('Aucune palette sélectionnée.'); return; }
+
+  const nomInput = document.getElementById('prep-nom');
+  const nom = nomInput ? nomInput.value.trim() : '';
+
+  const { data: cam, error } = await sb.from('camions').insert({
+    statut: 'preparation', nom: nom || null
+  }).select().single();
+
+  if (error) { alert('Erreur : ' + error.message); return; }
+
+  for (const p of palettesDansCamion) {
+    await sb.from('palettes').update({
+      statut: 'preparation', camion_id: cam.id,
+      pos_x: p._pos ? p._pos.x : null,
+      pos_y: p._pos ? p._pos.y : null,
+      rotation: p.rotation || 0
+    }).eq('id', p.id);
+  }
+
+  palettesDansCamion = [];
+  if (nomInput) nomInput.value = '';
+  renderJauge(); renderPlanCamion();
+  await chargerDonnees(); renderFrigo(); renderFrigoChargement(); renderCamionsAttente();
+
+  // Aller directement sur "Camions en attente"
+  const btnAttente = [...document.querySelectorAll('nav button')].find(b => b.getAttribute('onclick')?.includes("'attente'"));
+  afficherSection('attente', btnAttente);
+}
+
+function viderChargement() {
+  palettesDansCamion = [];
+  rafraichirChargement();
+}
+
+
+// ─── CAMIONS PARTIS ───
+function renderCamions() {
+  const el = document.getElementById('camions-content');
+  const cams = camions.filter(c => c.statut === 'parti');
+  if (!cams.length) { el.innerHTML = '<div class="alerte">Aucun camion expédié pour le moment.</div>'; return; }
+  el.innerHTML = `<div style="overflow-x:auto"><table>
+    <thead><tr>
+      <th>Transporteur</th><th>Immat.</th><th>Arrivée</th><th>Départ</th>
+      <th>Palettes</th><th>Poids total</th><th>Commentaire</th><th></th>
+    </tr></thead><tbody>
+    ${cams.map(c => {
+      const pals = palettes.filter(p => p.camion_id === c.id);
+      const poids = pals.reduce((s,p)=>s+(p.poids_kg||0),0);
+      return `<tr>
+        <td><b>${c.transporteur}</b></td>
+        <td>${c.immatriculation||'—'}</td>
+        <td>${c.date_heure_arrivee?fmtDT(c.date_heure_arrivee):'—'}</td>
+        <td>${c.date_heure_depart?fmtDT(c.date_heure_depart):'—'}</td>
+        <td>${pals.length}</td>
+        <td>${Math.round(poids)} kg</td>
+        <td style="font-size:.8rem">${c.commentaire||'—'}</td>
+        <td><button class="btn btn-vert btn-sm" onclick="ouvrirDetailCamion('${c.id}')">Voir / Modifier</button></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div>`;
+}
+
+// ─── CAMIONS EN ATTENTE (préparation) ───
+function renderCamionsAttente() {
+  const el = document.getElementById('attente-content');
+  if (!el) return;
+  const cams = camions.filter(c => c.statut === 'preparation');
+  if (!cams.length) { el.innerHTML = '<div class="alerte">Aucun camion en préparation.</div>'; return; }
+  el.innerHTML = cams.map(c => {
+    const pals = palettes.filter(p => p.camion_id === c.id);
+    const poids = pals.reduce((s,p)=>s+(p.poids_kg||0),0);
+    const equiv = calcEquiv(pals);
+    const pct = Math.min(100, Math.round((equiv/33)*100));
+    return `<div class="lot-bloc" style="margin-bottom:10px;">
+      <div class="lot-header" style="cursor:pointer;" onclick="ouvrirDetailCamion('${c.id}')">
+        <span class="lot-num">${c.nom || c.transporteur || 'Camion en préparation'}${c.transporteur && c.nom ? ' — '+c.transporteur : ''}${c.immatriculation ? ' — '+c.immatriculation : ''}</span>
+        <span class="lot-info"><b>${pals.length}</b> pal. · <b>${Math.round(poids)}</b> kg · <b>${pct}%</b> chargé</span>
+        <span class="lot-info" style="margin-left:auto">📅 créé le ${fmtDT(c.created_at)}</span>
+        <button class="btn btn-vert btn-sm" onclick="event.stopPropagation();ouvrirDetailCamion('${c.id}')">Compléter / Voir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── MODAL DÉTAIL CAMION ───
+function ouvrirDetailCamion(camionId) {
+  camionEnEdition = camions.find(c => c.id === camionId);
+  palettesAjoutees = [];
+  palettesRetirees = [];
+  if (!camionEnEdition) return;
+  renderModalCamion();
+  document.getElementById('modal-camion').style.display = 'flex';
+}
+function closeModalCamion() {
+  document.getElementById('modal-camion').style.display = 'none';
+  camionEnEdition = null; palettesAjoutees = []; palettesRetirees = [];
+}
+
+function renderModalCamion() {
+  const c = camionEnEdition;
+  const enPrep = c.statut === 'preparation';
+  document.getElementById('mc-titre').textContent = enPrep
+    ? `⏳ ${c.nom || 'Camion en préparation'}${c.transporteur ? ' — ' + c.transporteur : ''}`
+    : `🚛 ${c.transporteur||''} — ${c.immatriculation||''}`;
+
+  // Infos modifiables
+  if (enPrep) {
+    document.getElementById('mc-infos').innerHTML = `
+      <div style="grid-column:1/-1">
+        <label>Nom du camion</label>
+        <input id="mc-nom" value="${c.nom||''}" placeholder="Ex : Camion lundi matin, Rotation 1…">
+      </div>
+      <div>
+        <label>Transporteur *</label>
+        <div class="combo-wrap">
+          <input id="mc-transp" value="${c.transporteur||''}" placeholder="Saisir ou choisir…" autocomplete="off" oninput="filtrerCombo('transporteurs','mc-transp','combo-mc-transp')" onfocus="ouvrirCombo('transporteurs','mc-transp','combo-mc-transp')" onblur="setTimeout(()=>fermerCombo('combo-mc-transp'),150)">
+          <div id="combo-mc-transp" class="combo-list"></div>
+        </div>
+      </div>
+      <div>
+        <label>Immatriculation *</label>
+        <div class="combo-wrap">
+          <input id="mc-immat" value="${c.immatriculation||''}" placeholder="Saisir ou choisir…" autocomplete="off" oninput="filtrerCombo('immatriculations','mc-immat','combo-mc-immat')" onfocus="ouvrirCombo('immatriculations','mc-immat','combo-mc-immat')" onblur="setTimeout(()=>fermerCombo('combo-mc-immat'),150)">
+          <div id="combo-mc-immat" class="combo-list"></div>
+        </div>
+      </div>
+      <div><label>Arrivée</label><input id="mc-arrivee" type="datetime-local" value="${c.date_heure_arrivee?c.date_heure_arrivee.slice(0,16):''}"></div>
+      <div><label>Départ</label><input id="mc-depart" type="datetime-local" value="${c.date_heure_depart?c.date_heure_depart.slice(0,16):''}"></div>
+      <div style="grid-column:1/-1"><label>Commentaire</label><textarea id="mc-commentaire">${c.commentaire||''}</textarea></div>`;
+  } else {
+    document.getElementById('mc-infos').innerHTML = `
+      <div><label>Transporteur</label><input id="mc-transp" value="${c.transporteur||''}"></div>
+      <div><label>Immatriculation</label><input id="mc-immat" value="${c.immatriculation||''}"></div>
+      <div><label>Arrivée</label><input id="mc-arrivee" type="datetime-local" value="${c.date_heure_arrivee?c.date_heure_arrivee.slice(0,16):''}"></div>
+      <div><label>Départ</label><input id="mc-depart" type="datetime-local" value="${c.date_heure_depart?c.date_heure_depart.slice(0,16):''}"></div>
+      <div style="grid-column:1/-1"><label>Commentaire</label><textarea id="mc-commentaire">${c.commentaire||''}</textarea></div>`;
+  }
+
+  document.getElementById('mc-btn-parti').style.display = enPrep ? 'inline-block' : 'none';
+
+  // Palettes actuelles (moins celles retirées)
+  const palsActuelles = palettes.filter(p => p.camion_id === c.id && !palettesRetirees.includes(p.id));
+  const palsTotal = [...palsActuelles, ...palettesAjoutees];
+
+  // Stats
+  const especes = {};
+  palsTotal.forEach(p => {
+    const lot = lots.find(l => l.id === p.lot_id);
+    if (!lot) return;
+    const cle = lot.espece + '||' + lot.variete;
+    if (!especes[cle]) especes[cle] = { espece: lot.espece, variete: lot.variete, nb: 0, poids: 0 };
+    especes[cle].nb++;
+    especes[cle].poids += p.poids_kg || 0;
+  });
+  const poidsTotal = palsTotal.reduce((s,p)=>s+(p.poids_kg||0),0);
+  const equiv = calcEquiv(palsTotal);
+  const pct = Math.min(100, Math.round((equiv/33)*100));
+
+  document.getElementById('mc-stats').innerHTML = `
+    <div style="margin-bottom:10px;">
+      ${Object.values(especes).map(e => `
+        <span class="detail-stat">${badgeEspece(e.espece)} ${e.variete} — <b>${e.nb}</b> pal. · <b>${Math.round(e.poids)}</b> kg</span>`).join('')}
+      <span class="detail-stat">Total : <b>${palsTotal.length}</b> pal. · <b>${Math.round(poidsTotal)}</b> kg · <b>${pct}%</b> chargé</span>
+    </div>
+    <div class="jauge-bar" style="height:12px;"><div class="jauge-fill ${pct>=100?'plein':pct>=85?'presque':''}" style="width:${pct}%"></div></div>`;
+
+  // Liste palettes dans camion
+  document.getElementById('mc-palettes').innerHTML = palsActuelles.length + palettesAjoutees.length === 0
+    ? '<div class="alerte">Aucune palette dans ce camion.</div>'
+    : `<div style="border:1px solid var(--gris-b);border-radius:8px;overflow:hidden;">
+      ${palsActuelles.map(p => {
+        const lot = lots.find(l => l.id === p.lot_id);
+        return `<div class="pal-row">
+          <span><b>${p.numero_palette}</b> — ${lot?lot.numero_lot+' ('+lot.espece+' '+lot.variete+')':''} — ${fmtFormat(p.format)} · ${p.poids_kg||0} kg</span>
+          <button class="btn btn-rouge btn-sm" onclick="retirerDeCamion('${p.id}')">Retirer</button>
+        </div>`;
+      }).join('')}
+      ${palettesAjoutees.map(p => {
+        const lot = lots.find(l => l.id === p.lot_id);
+        return `<div class="pal-row" style="background:var(--vert-l);">
+          <span><b>${p.numero_palette}</b> — ${lot?lot.numero_lot+' ('+lot.espece+' '+lot.variete+')':''} — ${fmtFormat(p.format)} · ${p.poids_kg||0} kg <em style="color:var(--vert-c)">(nouveau)</em></span>
+          <button class="btn btn-rouge btn-sm" onclick="annulerAjoutCamion('${p.id}')">Annuler</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  // Stock disponible à ajouter
+  const stockDispo = palettes.filter(p => p.statut === 'stock' && !palettesAjoutees.find(x=>x.id===p.id));
+  document.getElementById('mc-stock-dispo').innerHTML = stockDispo.length === 0
+    ? '<div class="alerte">Aucune palette disponible en stock.</div>'
+    : `<div style="border:1px solid var(--gris-b);border-radius:8px;overflow:hidden;max-height:200px;overflow-y:auto;">
+      ${stockDispo.map(p => {
+        const lot = lots.find(l => l.id === p.lot_id);
+        return `<div class="pal-row">
+          <span><b>${p.numero_palette}</b> — ${lot?lot.numero_lot+' ('+lot.espece+' '+lot.variete+')':''} — ${fmtFormat(p.format)} · ${p.poids_kg||0} kg</span>
+          <button class="btn btn-vert btn-sm" onclick="ajouterACamion('${p.id}')">Ajouter</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  // Plan de chargement (camions en préparation)
+  const planSep = document.getElementById('mc-plan-sep');
+  const planTitre = document.getElementById('mc-plan-titre');
+  const planWrap = document.getElementById('mc-plan-wrap');
+  const planEl = document.getElementById('mc-plan');
+  const planActions = document.getElementById('mc-plan-actions');
+  if (enPrep && palsTotal.length) {
+    planSep.style.display = ''; planTitre.style.display = ''; planWrap.style.display = ''; planActions.style.display = '';
+    palsTotal.forEach(p => {
+      if (!p._pos) {
+        if (p.pos_x != null && p.pos_y != null) {
+          let w = p.format === '100x120' ? 125 : 80, l = 120;
+          if (p.rotation === 90) { const t = w; w = l; l = t; }
+          p._pos = { x: p.pos_x, y: p.pos_y, w, l, rotation: p.rotation || 0, type: p.format };
+        }
+      }
+    });
+    // Place automatiquement les palettes ajoutées sans position
+    autoPlacerManquantesCtx(palsTotal);
+    renderPlanInto('mc-plan', palsTotal, {
+      onDblClickPal: 'retirerDeCamionPlan',
+      onRotate: 'pivoterPaletteModal',
+      dragCtx: 'modal'
+    });
+  } else {
+    planSep.style.display = 'none'; planTitre.style.display = 'none'; planWrap.style.display = 'none'; planActions.style.display = 'none';
+  }
+}
+
+// Renvoie les palettes actuellement affectées au camion en édition (modal), avec leurs ajouts/retraits en attente
+function palsModalActuelles() {
+  const c = camionEnEdition;
+  if (!c) return [];
+  const palsActuelles = palettes.filter(p => p.camion_id === c.id && !palettesRetirees.includes(p.id));
+  return [...palsActuelles, ...palettesAjoutees];
+}
+
+// Double-clic sur une palette du plan (modal) -> la retire du camion en préparation
+function retirerDeCamionPlan(palId) {
+  if (palettesAjoutees.find(p => p.id === palId)) {
+    annulerAjoutCamion(palId);
+  } else {
+    retirerDeCamion(palId);
+  }
+}
+
+
+async function marquerCamionParti() {
+  const c = camionEnEdition;
+  const transporteur = document.getElementById('mc-transp').value.trim();
+  const immat = document.getElementById('mc-immat').value.trim();
+  if (!transporteur || !immat) {
+    alert('Le transporteur et l\'immatriculation sont obligatoires pour valider le départ du camion.');
+    return;
+  }
+
+  const transList = getTransporteurs();
+  if (transporteur && !transList.includes(transporteur)) { transList.push(transporteur); setRef('transporteurs', transList); }
+  const immatList = getImmatriculations();
+  if (immat && !immatList.includes(immat)) { immatList.push(immat); setRef('immatriculations', immatList); }
+
+  // D'abord enregistrer les modifs (palettes ajoutées/retirées, infos)
+  await sauvegarderModifCamion(true);
+
+  await sb.from('camions').update({
+    transporteur, immatriculation: immat || null,
+    date_heure_arrivee: document.getElementById('mc-arrivee').value || null,
+    date_heure_depart: document.getElementById('mc-depart').value || null,
+    commentaire: document.getElementById('mc-commentaire').value || null,
+    statut: 'parti'
+  }).eq('id', c.id);
+
+  const idsPartis = palettes.filter(p => p.camion_id === c.id).map(p => p.id);
+  await sb.from('palettes').update({ statut: 'partie' }).in('id', idsPartis);
+
+  closeModalCamion();
+  await chargerDonnees();
+  renderFrigo(); renderFrigoChargement(); renderCamions(); renderCamionsAttente();
+  alert('Camion parti — stock mis à jour ✔');
+}
+
+function retirerDeCamion(palId) {
+  palettesRetirees.push(palId);
+  renderModalCamion();
+}
+function annulerAjoutCamion(palId) {
+  palettesAjoutees = palettesAjoutees.filter(p => p.id !== palId);
+  renderModalCamion();
+}
+function ajouterACamion(palId) {
+  const pal = palettes.find(p => p.id === palId);
+  if (pal) palettesAjoutees.push(pal);
+  renderModalCamion();
+}
+
+async function sauvegarderModifCamion(silent) {
+  const c = camionEnEdition;
+  const statutPalette = c.statut === 'preparation' ? 'preparation' : 'partie';
+
+  // Mettre à jour infos camion
+  const nomEl = document.getElementById('mc-nom');
+  await sb.from('camions').update({
+    ...(nomEl ? { nom: nomEl.value.trim() || null } : {}),
+    transporteur: document.getElementById('mc-transp').value || null,
+    immatriculation: document.getElementById('mc-immat').value || null,
+    date_heure_arrivee: document.getElementById('mc-arrivee').value || null,
+    date_heure_depart: document.getElementById('mc-depart').value || null,
+    commentaire: document.getElementById('mc-commentaire').value || null,
+  }).eq('id', c.id);
+
+  // Retirer palettes
+  if (palettesRetirees.length) {
+    await sb.from('palettes').update({ statut: 'stock', camion_id: null, pos_x: null, pos_y: null, rotation: 0 }).in('id', palettesRetirees);
+  }
+  // Ajouter palettes
+  if (palettesAjoutees.length) {
+    await sb.from('palettes').update({ statut: statutPalette, camion_id: c.id }).in('id', palettesAjoutees.map(p=>p.id));
+  }
+
+  if (silent) return;
+
+  closeModalCamion();
+  await chargerDonnees();
+  renderFrigo(); renderFrigoChargement(); renderCamions(); renderCamionsAttente();
+  alert('Modifications enregistrées ✔');
+}
+
+// ─── MODAL NOUVEAU LOT ───
+let nbPalettesForms = 0;
+
+async function openModalLot() {
+  nbPalettesForms = 0;
+  document.getElementById('nl-num').value = '';
+  document.getElementById('nl-parcelle').value = '';
+  document.getElementById('nl-parcelle-list').classList.remove('open');
+  document.getElementById('nl-parcelle-status').textContent = '⏳ chargement…';
+  document.getElementById('nl-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('palettes-form').innerHTML = '';
+
+  // Réinitialiser espèce + variété
+  const especeSel = document.getElementById('nl-espece');
+  const varSel    = document.getElementById('nl-variete');
+  especeSel.disabled = false;
+  especeSel.value = '';
+  varSel.disabled = false;
+  varSel.innerHTML = '<option value="">— sélectionner une parcelle —</option>';
+
+  // Toujours recharger depuis Supabase à l'ouverture
+  const { data, error } = await sb.from('parcelles').select('*').order('code_parcelle', { ascending: true });
+
+  if (error) {
+    console.error('Erreur Supabase parcelles :', error);
+    document.getElementById('nl-parcelle-status').textContent = `⚠️ Erreur : ${error.message}`;
+  } else if (!data || data.length === 0) {
+    parcelles = [];
+    document.getElementById('nl-parcelle-status').textContent = '⚠️ Table "parcelles" vide ou inaccessible (RLS ?)';
+    console.warn('Table parcelles retourne 0 lignes. Vérifie la RLS dans Supabase.');
+  } else {
+    parcelles = data;
+    document.getElementById('nl-parcelle-status').textContent = `✅ ${parcelles.length} parcelles chargées`;
+    console.log('Parcelles chargées :', parcelles.slice(0,3));
+  }
+
+  populerEspecesSelect('nl-espece', '');
+  ajouterPaletteForm();
+  document.getElementById('modal-lot').style.display = 'flex';
+  // pas de .focus() : évite l'ouverture automatique
+}
+function closeModalLot() { document.getElementById('modal-lot').style.display = 'none'; }
+
+function chargerVarietesSelect() {
+  const espece = document.getElementById('nl-espece').value;
+  const varietes = getVarietesParcelles(espece);
+  const sel = document.getElementById('nl-variete');
+  sel.innerHTML = '<option value="">— choisir —</option>' + varietes.map(v => `<option value="${v}">${v}</option>`).join('');
+  majFormatPalettes();
+}
+
+function majFormatPalettes() {
+  const espece = document.getElementById('nl-espece').value;
+  const format = espece === 'Abricot' ? '100x120' : '80x120';
+  document.querySelectorAll('#palettes-form .pf-format').forEach(sel => {
+    sel.value = format;
+  });
+}
+
+function mettreAJourNumerosPalettes() {
+  const num = document.getElementById('nl-num').value.trim();
+  document.querySelectorAll('#palettes-form .pf-num-display').forEach((el, i) => {
+    el.textContent = num ? `${num}-${i+1}` : `—`;
+  });
+}
+
+function ajouterPaletteForm() {
+  nbPalettesForms++;
+  const num = document.getElementById('nl-num').value.trim();
+  const div = document.createElement('div');
+  div.className = 'palette-row';
+  div.style.cssText = 'display:grid;grid-template-columns:auto 1fr 1fr auto auto;gap:8px;align-items:end;margin-bottom:8px;';
+  div.innerHTML = `
+    <div>
+      <label>N° Palette</label>
+      <div style="padding:8px 10px;background:var(--gris);border-radius:7px;font-weight:700;font-size:.88rem;min-width:90px;" class="pf-num-display">
+        ${num ? num + '-' + nbPalettesForms : '—'}
+      </div>
+    </div>
+    <div>
+      <label>Format</label>
+      <select class="pf-format">
+        <option value="80x120">80×120 (pêche/nect.)</option>
+        <option value="100x120">100×120 (abricot)</option>
+      </select>
+    </div>
+    <div><label>Poids (kg)</label><input type="number" step="0.1" placeholder="320" class="pf-poids"></div>
+    <div style="display:flex;flex-direction:column;justify-content:flex-end;">
+      <label style="white-space:nowrap;">
+        <input type="checkbox" class="pf-demi" style="width:auto;margin-right:4px;">1/2 Pal
+      </label>
+    </div>
+    <div><button class="btn btn-rouge btn-sm" onclick="supprimerPaletteForm(this)" style="margin-bottom:0">✕</button></div>`;
+  document.getElementById('palettes-form').appendChild(div);
+  majFormatPalettes();
+}
+
+function supprimerPaletteForm(btn) {
+  btn.closest('.palette-row').remove();
+  // Renuméroter
+  const num = document.getElementById('nl-num').value.trim();
+  document.querySelectorAll('#palettes-form .pf-num-display').forEach((el, i) => {
+    el.textContent = num ? `${num}-${i+1}` : `—`;
+  });
+  // Mettre à jour le compteur
+  nbPalettesForms = document.querySelectorAll('#palettes-form .pf-num-display').length;
+}
+
+async function sauvegarderLot() {
+  const num = document.getElementById('nl-num').value.trim();
+  const parcelle = document.getElementById('nl-parcelle').value.trim();
+  const espece = document.getElementById('nl-espece').value;
+  const variete = document.getElementById('nl-variete').value;
+  const date = document.getElementById('nl-date').value;
+  if (!num||!parcelle||!variete||!date) { alert('Remplissez tous les champs obligatoires (*)'); return; }
+
+  const { data: lot, error: eL } = await sb.from('lots').insert({ numero_lot: num, parcelle, espece, variete, date_recolte: date }).select().single();
+  if (eL) { alert('Erreur lot : ' + eL.message); return; }
+
+  // Récupérer toutes les lignes palette via la classe dédiée
+  const rows = document.querySelectorAll('#palettes-form .palette-row');
+  const palettesAInserer = [];
+  let idx = 1;
+  for (const row of rows) {
+    const isDemi = row.querySelector('.pf-demi') && row.querySelector('.pf-demi').checked;
+    palettesAInserer.push({
+      lot_id: lot.id,
+      numero_palette: `${num}-${idx}`,
+      format: isDemi ? 'demi' : row.querySelector('.pf-format').value,
+      poids_kg: parseFloat(row.querySelector('.pf-poids').value) || 0,
+      statut: 'stock'
+    });
+    idx++;
+  }
+
+  if (palettesAInserer.length) {
+    const { error: eP } = await sb.from('palettes').insert(palettesAInserer);
+    if (eP) { alert('Erreur palettes : ' + eP.message); return; }
+  }
+
+  closeModalLot();
+  await chargerDonnees();
+  renderFrigo();
+}
+
+// ─── MODAL ÉDITION LOT ───
+let lotEnEdition = null;
+let palettesEditSupprimees = []; // ids de palettes "stock" retirées
+
+function openModalEditLot(lotId) {
+  lotEnEdition = lots.find(l => l.id === lotId);
+  if (!lotEnEdition) return;
+  palettesEditSupprimees = [];
+
+  document.getElementById('el-num').value = lotEnEdition.numero_lot;
+  document.getElementById('el-parcelle').value = lotEnEdition.parcelle;
+  document.getElementById('el-parcelle-list').classList.remove('open');
+  // Réactiver espèce/variété (au cas où un précédent choix les aurait verrouillés)
+  document.getElementById('el-espece').disabled = false;
+  document.getElementById('el-variete').disabled = false;
+  populerEspecesSelect('el-espece', lotEnEdition.espece);
+  document.getElementById('el-date').value = lotEnEdition.date_recolte;
+  chargerVarietesSelectEdit();
+  document.getElementById('el-variete').value = lotEnEdition.variete;
+
+  const palsLot = palettes.filter(p => p.lot_id === lotId);
+  const palsStock = palsLot.filter(p => p.statut === 'stock');
+  const palsAutres = palsLot.filter(p => p.statut !== 'stock');
+
+  const infoEl = document.getElementById('el-info-partie');
+  if (palsAutres.length) {
+    infoEl.style.display = 'block';
+    infoEl.textContent = `ℹ️ ${palsAutres.length} palette(s) de ce lot sont déjà chargées sur un camion et ne sont pas modifiables ici.`;
+  } else {
+    infoEl.style.display = 'none';
+  }
+
+  const form = document.getElementById('palettes-edit-form');
+  form.innerHTML = '';
+  palsStock.forEach(p => ajouterPaletteEditForm(p));
+  if (!palsStock.length) ajouterPaletteEditForm();
+
+  document.getElementById('modal-edit-lot').style.display = 'flex';
+}
+
+function closeModalEditLot() {
+  document.getElementById('modal-edit-lot').style.display = 'none';
+  lotEnEdition = null; palettesEditSupprimees = [];
+}
+
+function chargerVarietesSelectEdit() {
+  const espece = document.getElementById('el-espece').value;
+  const varietes = getVarietesParcelles(espece);
+  const sel = document.getElementById('el-variete');
+  // Inclure la variété actuelle si absente des parcelles
+  const varActuelle = lotEnEdition ? lotEnEdition.variete : '';
+  const toutes = varActuelle && !varietes.includes(varActuelle) ? [varActuelle, ...varietes] : varietes;
+  sel.innerHTML = '<option value="">— choisir —</option>' + toutes.map(v => `<option value="${v}">${v}</option>`).join('');
+}
+
+function ajouterPaletteEditForm(pal) {
+  const div = document.createElement('div');
+  div.className = 'palette-edit-row';
+  div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:8px;align-items:end;margin-bottom:8px;';
+  if (pal) div.dataset.palId = pal.id;
+  div.innerHTML = `
+    <div>
+      <label>N° Palette</label>
+      <input class="pef-num" value="${pal ? pal.numero_palette : ''}" placeholder="ex: 70450-1">
+    </div>
+    <div>
+      <label>Format</label>
+      <select class="pef-format">
+        <option value="80x120" ${pal && pal.format!=='100x120'?'selected':''}>80×120 (pêche/nect.)</option>
+        <option value="100x120" ${pal && pal.format==='100x120'?'selected':''}>100×120 (abricot)</option>
+      </select>
+    </div>
+    <div><label>Poids (kg)</label><input type="number" step="0.1" class="pef-poids" value="${pal ? (pal.poids_kg||'') : ''}" placeholder="320"></div>
+    <div style="display:flex;flex-direction:column;justify-content:flex-end;">
+      <label style="white-space:nowrap;">
+        <input type="checkbox" class="pef-demi" style="width:auto;margin-right:4px;" ${pal && pal.format==='demi'?'checked':''}>1/2 Pal
+      </label>
+    </div>
+    <div><button class="btn btn-rouge btn-sm" onclick="supprimerPaletteEditForm(this)" style="margin-bottom:0">✕</button></div>`;
+  document.getElementById('palettes-edit-form').appendChild(div);
+}
+
+function supprimerPaletteEditForm(btn) {
+  const row = btn.closest('.palette-edit-row');
+  const palId = row.dataset.palId;
+  if (palId) palettesEditSupprimees.push(palId);
+  row.remove();
+}
+
+async function sauvegarderEditLot() {
+  const num = document.getElementById('el-num').value.trim();
+  const parcelle = document.getElementById('el-parcelle').value.trim();
+  const espece = document.getElementById('el-espece').value;
+  const variete = document.getElementById('el-variete').value;
+  const date = document.getElementById('el-date').value;
+  if (!num||!parcelle||!variete||!date) { alert('Remplissez tous les champs obligatoires (*)'); return; }
+
+  const { error: eL } = await sb.from('lots').update({ numero_lot: num, parcelle, espece, variete, date_recolte: date }).eq('id', lotEnEdition.id);
+  if (eL) { alert('Erreur lot : ' + eL.message); return; }
+
+  // Supprimer les palettes retirées
+  if (palettesEditSupprimees.length) {
+    const { error: eD } = await sb.from('palettes').delete().in('id', palettesEditSupprimees);
+    if (eD) { alert('Erreur suppression palettes : ' + eD.message); return; }
+  }
+
+  // Mettre à jour / insérer les palettes restantes
+  const rows = document.querySelectorAll('#palettes-edit-form .palette-edit-row');
+  const aInserer = [];
+  const aMettreAJour = [];
+  for (const row of rows) {
+    const numPalette = row.querySelector('.pef-num').value.trim();
+    const format = row.querySelector('.pef-format').value;
+    const poids = parseFloat(row.querySelector('.pef-poids').value) || 0;
+    if (!numPalette) continue;
+    const palId = row.dataset.palId;
+    const isDemi = row.querySelector('.pef-demi') && row.querySelector('.pef-demi').checked;
+    const formatFinal = isDemi ? 'demi' : format;
+    if (palId) {
+      aMettreAJour.push({ id: palId, numero_palette: numPalette, format: formatFinal, poids_kg: poids });
+    } else {
+      aInserer.push({ lot_id: lotEnEdition.id, numero_palette: numPalette, format: formatFinal, poids_kg: poids, statut: 'stock' });
+    }
+  }
+
+  for (const p of aMettreAJour) {
+    const { error } = await sb.from('palettes').update({ numero_palette: p.numero_palette, format: p.format, poids_kg: p.poids_kg }).eq('id', p.id);
+    if (error) { alert('Erreur mise à jour palette : ' + error.message); return; }
+  }
+  if (aInserer.length) {
+    const { error: eP } = await sb.from('palettes').insert(aInserer);
+    if (eP) { alert('Erreur palettes : ' + eP.message); return; }
+  }
+
+  closeModalEditLot();
+  await chargerDonnees();
+  renderFrigo(); renderFrigoChargement();
+}
+
+
+// ─── COMBOBOX ───
+function ouvrirCombo(cle, inputId, listId) {
+  const vals = cle === 'transporteurs' ? getTransporteurs() : getImmatriculations();
+  const input = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+  const q = input.value.toLowerCase();
+  const filtrés = vals.filter(v => v.toLowerCase().includes(q));
+  if (!filtrés.length) { list.classList.remove('open'); return; }
+  list.innerHTML = filtrés.map(v => `<div class="combo-item" onmousedown="choisirCombo('${inputId}','${listId}','${v.replace(/'/g,"&#39;")}')">${v}</div>`).join('');
+  list.classList.add('open');
+}
+
+function filtrerCombo(cle, inputId, listId) { ouvrirCombo(cle, inputId, listId); }
+function fermerCombo(listId) { document.getElementById(listId).classList.remove('open'); }
+function choisirCombo(inputId, listId, val) {
+  document.getElementById(inputId).value = val;
+  fermerCombo(listId);
+}
+
+// ─── RÉFÉRENTIELS ───
+function renderReferentiels() {
+  // Variétés depuis la table parcelles Supabase (lecture seule)
+  const especes = getEspecesParcelles();
+  if (especes.length) {
+    document.getElementById('ref-varietes-content').innerHTML = especes.map(esp => {
+      const vars = getVarietesParcelles(esp);
+      return `<div style="margin-bottom:14px;">
+        <div style="font-weight:700;margin-bottom:6px;">${badgeEspece(esp)}</div>
+        <div>${vars.map(v => `<span class="variete-tag">${v}</span>`).join('')}</div>
+      </div>`;
+    }).join('<hr class="sep">');
+  } else {
+    document.getElementById('ref-varietes-content').innerHTML =
+      '<div class="alerte">Aucune parcelle chargée depuis Supabase.</div>';
+  }
+
+  const transList = getTransporteurs();
+  document.getElementById('ref-transp-content').innerHTML = transList.length
+    ? transList.map(t => `<span class="variete-tag">${t}<button onclick="supprimerRef('transporteurs','${t}')">×</button></span>`).join('')
+    : '<div class="alerte">Aucun transporteur enregistré.</div>';
+
+  const immatList = getImmatriculations();
+  document.getElementById('ref-immat-content').innerHTML = immatList.length
+    ? immatList.map(i => `<span class="variete-tag">${i}<button onclick="supprimerRef('immatriculations','${i}')">×</button></span>`).join('')
+    : '<div class="alerte">Aucune immatriculation enregistrée.</div>';
+}
+
+function ajouterVariete(espece) {
+  const id = 'nv-' + espece.replace(/ /g,'_');
+  const val = document.getElementById(id).value.trim();
+  if (!val) return;
+  const varietes = getVarietes();
+  if (!varietes[espece].includes(val)) { varietes[espece].push(val); setRef('varietes', varietes); }
+  document.getElementById(id).value = '';
+  renderReferentiels();
+}
+function supprimerVariete(espece, variete) {
+  const varietes = getVarietes();
+  varietes[espece] = varietes[espece].filter(v => v !== variete);
+  setRef('varietes', varietes);
+  renderReferentiels();
+}
+
+function ajouterRef(cle, inputId) {
+  const val = document.getElementById(inputId).value.trim();
+  if (!val) return;
+  const list = cle === 'transporteurs' ? getTransporteurs() : getImmatriculations();
+  if (!list.includes(val)) { list.push(val); setRef(cle, list); }
+  document.getElementById(inputId).value = '';
+  renderReferentiels();
+}
+function supprimerRef(cle, val) {
+  let list = cle === 'transporteurs' ? getTransporteurs() : getImmatriculations();
+  list = list.filter(v => v !== val);
+  setRef(cle, list);
+  renderReferentiels();
+}
+
+// ─── UTILS ───
+function fmt(d) { if (!d) return '—'; const [y,m,j] = d.split('-'); return `${j}/${m}/${y}`; }
+function fmtDT(d) { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString('fr-FR') + ' ' + dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}); }
+
+// ─── GESTION DES ACCÈS ───
+// Utilisateurs par défaut (stockés dans localStorage, modifiables via panneau admin)
+const USERS_DEFAULT = [
+  { login: "admin", pass: "admin2024", isAdmin: true },
+  { login: "user",  pass: "vergers",   isAdmin: false }
+];
+
+function getUsers() {
+  const stored = localStorage.getItem('sg_users');
+  return stored ? JSON.parse(stored) : USERS_DEFAULT;
+}
+function saveUsers(users) {
+  localStorage.setItem('sg_users', JSON.stringify(users));
+}
+
+let currentUser = null;
+
+function verifierConnexion() {
+  const login = document.getElementById('login-user').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  const users = getUsers();
+  const found = users.find(u => u.login === login && u.pass === pass);
+  if (found) {
+    currentUser = found;
+    sessionStorage.setItem('sg_auth', JSON.stringify({ login: found.login, isAdmin: found.isAdmin }));
+    document.getElementById('login-screen').classList.add('hidden');
+    errEl.classList.remove('visible');
+    document.getElementById('header-username').textContent = '👤 ' + found.login;
+    document.getElementById('btn-admin').style.display = found.isAdmin ? '' : 'none';
+    init();
+  } else {
+    errEl.classList.add('visible');
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-pass').focus();
+  }
+}
+
+function seDeconnecter() {
+  currentUser = null;
+  sessionStorage.removeItem('sg_auth');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').classList.remove('visible');
+  document.getElementById('login-screen').classList.remove('hidden');
+}
+
+// ─── PANNEAU ADMIN ───
+function ouvrirAdmin() {
+  if (!currentUser || !currentUser.isAdmin) return;
+  renderAdminUsers();
+  document.getElementById('admin-panel').classList.add('open');
+}
+function fermerAdmin() {
+  document.getElementById('admin-panel').classList.remove('open');
+}
+function renderAdminUsers() {
+  const users = getUsers();
+  const el = document.getElementById('admin-user-list');
+  el.innerHTML = users.map((u, i) => `
+    <div class="user-row">
+      <span>${u.login}</span>
+      <small>${u.isAdmin ? '⭐ Admin' : 'Utilisateur'}</small>
+      <button class="btn-pwd" onclick="adminChangerMdp(${i})">🔑 MDP</button>
+      ${u.login !== currentUser.login ? `<button class="btn-del" onclick="adminSupprimerUser(${i})">✕</button>` : ''}
+    </div>`).join('');
+}
+function adminSupprimerUser(i) {
+  const users = getUsers();
+  if (!confirm('Supprimer ' + users[i].login + ' ?')) return;
+  users.splice(i, 1);
+  saveUsers(users);
+  renderAdminUsers();
+}
+function adminChangerMdp(i) {
+  const users = getUsers();
+  const np = prompt('Nouveau mot de passe pour ' + users[i].login + ' :');
+  if (!np) return;
+  users[i].pass = np;
+  saveUsers(users);
+  alert('Mot de passe modifié.');
+}
+function adminAjouterUser() {
+  const login = document.getElementById('new-user-login').value.trim();
+  const pass  = document.getElementById('new-user-pass').value;
+  const isAdmin = document.getElementById('new-user-admin').checked;
+  if (!login || !pass) return alert('Remplis les deux champs.');
+  const users = getUsers();
+  if (users.find(u => u.login === login)) return alert('Cet identifiant existe déjà.');
+  users.push({ login, pass, isAdmin });
+  saveUsers(users);
+  document.getElementById('new-user-login').value = '';
+  document.getElementById('new-user-pass').value = '';
+  document.getElementById('new-user-admin').checked = false;
+  renderAdminUsers();
+}
+
+// Vérification au chargement
+const _stored = sessionStorage.getItem('sg_auth');
+if (_stored) {
+  const _s = JSON.parse(_stored);
+  currentUser = _s;
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('header-username').textContent = '👤 ' + _s.login;
+  document.getElementById('btn-admin').style.display = _s.isAdmin ? '' : 'none';
+  init();
+}
+</script>
+
+
+</body></html>
