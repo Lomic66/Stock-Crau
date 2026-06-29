@@ -148,7 +148,22 @@ t<!DOCTYPE html>
     text-align: center; line-height: 1.15;
   }
   .plan-pal.format-100 { background: #f9d7d4; border-color: #a3171f; }
-  .plan-pal.format-demi { background: #f6c9d6; border-color: #9d1e4a; }
+  .plan-pal.format-demi { background: #f3e8ff; border-color: #9061f9; overflow: hidden; }
+  .plan-pal-demi-top {
+    position: absolute; top: 0; left: 0; right: 0; height: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-bottom: 1.5px solid #9061f9; padding: 1px 2px;
+    font-size: .65rem; font-weight: 700; color: #6b21a8; line-height: 1.1;
+  }
+  .plan-pal-demi-bot {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 1px 2px; background: rgba(144,97,249,.08);
+    font-size: .65rem; font-weight: 700; color: #6b21a8; line-height: 1.1;
+  }
+  .plan-pal-demi-top .pp-sub-d, .plan-pal-demi-bot .pp-sub-d {
+    font-size: .54rem; font-weight: 400; opacity: .7;
+  }
   .plan-pal.dragging { opacity: .6; z-index: 50; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
   .plan-pal.removing { opacity: .25; filter: grayscale(1); }
   .plan-cabine {
@@ -179,7 +194,7 @@ t<!DOCTYPE html>
     padding: 0; z-index: 5;
   }
   .plan-pal .pp-rotate:hover { background: var(--vert-l); }
-  /* .plan-pal.format-100 .pp-rotate : bouton pivot activé aussi pour 100x120 */
+  .plan-pal.format-100 .pp-rotate { display: none; }
 
   .zone-drop { min-height: 160px; border: 2.5px dashed var(--gris-b); border-radius: 12px; padding: 12px; transition: border-color .2s, background .2s; }
   .zone-drop.drag-over { border-color: var(--vert); background: var(--vert-l); }
@@ -294,9 +309,53 @@ t<!DOCTYPE html>
   /* Palette row dans modal camion */
   .pal-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--gris-b); font-size: .84rem; }
   .pal-row:last-child { border-bottom: none; }
+
+  /* ─── SCANNER CODE-BARRES ─── */
+  #scanner-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.88);
+    z-index: 200; display: none; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+  }
+  #scanner-overlay.open { display: flex; }
+  #scanner-video {
+    width: min(96vw, 480px); border-radius: 12px; background: #000;
+    aspect-ratio: 4/3; object-fit: cover;
+  }
+  .scanner-cadre {
+    position: absolute; width: 80%; height: 80px;
+    border: 3px solid var(--vert-c); border-radius: 8px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.45);
+    pointer-events: none;
+  }
+  .scanner-laser {
+    position: absolute; left: 8px; right: 8px; height: 2px;
+    background: var(--rouge); opacity: .85;
+    animation: laser 1.6s ease-in-out infinite; top: 50%;
+  }
+  @keyframes laser { 0%,100%{transform:translateY(-30px)} 50%{transform:translateY(30px)} }
+  .scanner-wrap { position: relative; display: flex; align-items: center; justify-content: center; width: min(96vw,480px); }
+  #scanner-resultat { color: #fff; font-size: 1rem; font-weight: 700; min-height: 28px; text-align: center; }
+  #scanner-resultat.ok { color: #74e68d; }
+  #scanner-resultat.err { color: #f87171; }
+  .btn-scanner { background: var(--vert-c); color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: .88rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-scanner:hover { opacity: .88; }
 </style>
 </head>
 <body>
+
+
+<!-- ══════════════ SCANNER CODE-BARRES ══════════════ -->
+<div id="scanner-overlay">
+  <div style="color:#fff;font-size:1.1rem;font-weight:700;">📷 Scanner la palette</div>
+  <div class="scanner-wrap">
+    <video id="scanner-video" autoplay playsinline muted></video>
+    <div class="scanner-cadre">
+      <div class="scanner-laser"></div>
+    </div>
+  </div>
+  <div id="scanner-resultat">Pointez le code-barres vers la caméra…</div>
+  <button class="btn btn-gris" onclick="fermerScanner()">✕ Annuler</button>
+</div>
 
 <!-- ÉCRAN DE CONNEXION -->
 <div id="login-screen">
@@ -429,7 +488,7 @@ t<!DOCTYPE html>
       </div>
     </div>
     <div class="card mt-12">
-      <div class="card-title">🧊 Stock disponible — glisser vers le camion</div>
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">🧊 Stock disponible — glisser vers le camion<button class="btn-scanner" onclick="ouvrirScanner()">📷 Scanner une palette</button></div>
       <div id="frigo-chargement"><div class="alerte">Toutes les palettes en stock sont déjà dans le chargement.</div></div>
     </div>
   </div>
@@ -1135,7 +1194,7 @@ function construireUnites(pals) {
   const autres = pals.filter(p => p.format !== 'demi');
 
   autres.forEach(p => {
-    if (p.format === '100x120') unites.push({ w: 125, l: 120, pals: [p], type: '100x120', rotation: p.rotation || 0 });
+    if (p.format === '100x120') unites.push({ w: 125, l: 120, pals: [p], type: '100x120' });
     else unites.push({ w: 80, l: 120, pals: [p], type: '80x120', rotation: p.rotation || 0 });
   });
 
@@ -1190,7 +1249,7 @@ function marquerZone(grille, cx0, cy0, cw, ch) {
 // Place une unité dans la première zone libre trouvée (balayage par colonnes puis lignes),
 // en essayant l'orientation courante puis l'orientation alternative si besoin.
 function placerUnite(grille, u) {
-  const orientations = [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
+  const orientations = u.type === '100x120' ? [0] : [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
   for (const rot of orientations) {
     const dims = dimsUnite({ ...u, rotation: rot });
     const cw = Math.round(dims.l / GRID), ch = Math.round(dims.w / GRID);
@@ -1214,7 +1273,7 @@ function placerUnite(grille, u) {
 // Place une unité en partant du bas du camion vers le haut, et de gauche à droite
 // (utilisé quand on ajoute une nouvelle palette par double-clic ou glisser-déposer).
 function placerUniteBasHaut(grille, u) {
-  const orientations = [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
+  const orientations = u.type === '100x120' ? [0] : [u.rotation || 0, (u.rotation || 0) === 90 ? 0 : 90];
   for (const rot of orientations) {
     const dims = dimsUnite({ ...u, rotation: rot });
     const cw = Math.round(dims.l / GRID), ch = Math.round(dims.w / GRID);
@@ -1281,7 +1340,7 @@ function pivoterPaletteModal(palId) {
 }
 function pivoterPaletteCtx(palId, pals) {
   const pal = pals.find(p => p.id === palId);
-  if (!pal) return;
+  if (!pal || pal.format === '100x120') return;
   // Regrouper la palette avec son éventuelle paire de demi-palette pour la faire pivoter ensemble
   let groupe = [pal];
   if (pal.format === 'demi') {
@@ -1323,12 +1382,18 @@ function renderPlanInto(elId, pals, opts) {
     return;
   }
 
-  // Identifier les paires de palettes 1/2 Pal pour l'effet empilement visuel
+  // Identifier les paires de 1/2 Pal : on va afficher une seule case scindée par paire
   const demis = pals.filter(p => p.demi === true || p.demi === 1);
+  // Set des IDs qui sont le "2e" d'une paire → on les saute dans le rendu principal
   const deuxiemeDePaire = new Set();
-  for (let i = 1; i < demis.length; i += 2) deuxiemeDePaire.add(demis[i].id);
+  const paireParId = {}; // id_premier → palette_deuxieme
+  for (let i = 0; i + 1 < demis.length; i += 2) {
+    deuxiemeDePaire.add(demis[i+1].id);
+    paireParId[demis[i].id] = demis[i+1];
+  }
 
   el.innerHTML = pals.map(p => {
+    if (deuxiemeDePaire.has(p.id)) return ''; // rendu géré par la 1ère palette
     const pos = p._pos;
     if (!pos) return '';
     const lot = lots.find(l => l.id === p.lot_id);
@@ -1342,15 +1407,32 @@ function renderPlanInto(elId, pals, opts) {
     const rotateBtn = opts.onRotate
       ? `<button class="pp-rotate" title="Pivoter cette palette" onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();${opts.onRotate}('${p.id}')">⤾</button>`
       : '';
-    // Décalage visuel pour la 2e palette de la paire (effet empilement)
-    const decalage = deuxiemeDePaire.has(p.id)
-      ? 'transform:translate(3%,6%);box-shadow:2px 3px 0 rgba(144,97,249,.5);z-index:2;'
-      : isDemiPlan ? 'z-index:1;' : '';
+
+    if (isDemiPlan && paireParId[p.id]) {
+      // Case scindée haut/bas pour la paire
+      const p2 = paireParId[p.id];
+      const lot2 = lots.find(l => l.id === p2.lot_id);
+      return `<div class="plan-pal format-demi" data-pal="${p.id}"
+          style="left:${xPct}%;top:${yPct}%;width:${wPct}%;height:${hPct}%;"
+          onpointerdown="planDragStart(event,'${p.id}','${elId}','${opts.dragCtx}')" ${dblClick} title="Glisser pour ajuster · 2 palettes ½ empilées">
+        ${rotateBtn}
+        <div class="plan-pal-demi-top">
+          <span>${p.numero_palette}</span>
+          <span class="pp-sub-d">${lot ? lot.numero_lot : ''}</span>
+        </div>
+        <div class="plan-pal-demi-bot">
+          <span>${p2.numero_palette}</span>
+          <span class="pp-sub-d">${lot2 ? lot2.numero_lot : ''}</span>
+        </div>
+      </div>`;
+    }
+
+    // Palette normale (ou demi seule sans partenaire)
     return `<div class="plan-pal ${cls}" data-pal="${p.id}"
-        style="left:${xPct}%;top:${yPct}%;width:${wPct}%;height:${hPct}%;${decalage}"
+        style="left:${xPct}%;top:${yPct}%;width:${wPct}%;height:${hPct}%;"
         onpointerdown="planDragStart(event,'${p.id}','${elId}','${opts.dragCtx}')" ${dblClick} title="Glisser pour ajuster${opts.onDblClickPal?' · double-clic pour retirer':''}">
       ${rotateBtn}
-      <span class="pp-num">${p.numero_palette}${isDemiPlan ? ' <span style="font-size:.65em;opacity:.7">½</span>' : ''}</span>
+      <span class="pp-num">${p.numero_palette}${isDemiPlan ? ' <span style=\"font-size:.65em;opacity:.7\">½</span>' : ''}</span>
       <span class="pp-sub">${lot?lot.numero_lot:''} · ${fmtFormat(p.format)}</span>
     </div>`;
   }).join('') + `<div class="plan-legende" style="position:absolute;bottom:2px;left:4px;right:4px;"></div>`;
@@ -1682,7 +1764,7 @@ function renderModalCamion() {
       if (!p._pos) {
         if (p.pos_x != null && p.pos_y != null) {
           let w = p.format === '100x120' ? 125 : 80, l = 120;
-          if (p.rotation === 90) { const t = w; w = l; l = t; } // fonctionne pour 80x120 ET 100x120
+          if (p.rotation === 90) { const t = w; w = l; l = t; }
           p._pos = { x: p.pos_x, y: p.pos_y, w, l, rotation: p.rotation || 0, type: p.format };
         }
       }
@@ -2288,6 +2370,118 @@ if (_stored) {
   document.getElementById('btn-admin').style.display = _s.isAdmin ? '' : 'none';
   init();
 }
+
+// ─── SCANNER CODE-BARRES (ZXing) ───
+let scannerActif = false;
+let scannerStream = null;
+let scannerInterval = null;
+let zxingReader = null;
+
+async function ouvrirScanner() {
+  const overlay = document.getElementById('scanner-overlay');
+  const video = document.getElementById('scanner-video');
+  const resultat = document.getElementById('scanner-resultat');
+  resultat.textContent = 'Démarrage de la caméra…';
+  resultat.className = '';
+  overlay.classList.add('open');
+  scannerActif = true;
+
+  // Charger ZXing si pas encore chargé
+  if (!window.ZXing) {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.2/umd/index.min.js';
+    document.head.appendChild(script);
+    await new Promise(r => script.onload = r);
+  }
+
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    video.srcObject = scannerStream;
+    await video.play();
+    resultat.textContent = 'Pointez le code-barres vers la caméra…';
+
+    zxingReader = new ZXing.BrowserMultiFormatReader();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    scannerInterval = setInterval(() => {
+      if (!scannerActif || video.readyState < 2) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      try {
+        const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+        const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+        const result = new ZXing.MultiFormatReader().decode(binaryBitmap);
+        if (result) {
+          clearInterval(scannerInterval);
+          traiterCodeScanne(result.getText());
+        }
+      } catch(e) { /* pas de code détecté sur cette frame */ }
+    }, 250);
+
+  } catch(err) {
+    resultat.textContent = '⚠️ Caméra inaccessible : ' + err.message;
+    resultat.className = 'err';
+  }
+}
+
+function fermerScanner() {
+  scannerActif = false;
+  clearInterval(scannerInterval);
+  if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+  document.getElementById('scanner-overlay').classList.remove('open');
+}
+
+function traiterCodeScanne(code) {
+  const resultat = document.getElementById('scanner-resultat');
+  // Chercher la palette dans le stock par son numéro
+  const pal = palettes.find(p => p.numero_palette === code && p.statut === 'stock');
+  if (!pal) {
+    resultat.textContent = `⚠️ Palette "${code}" non trouvée dans le stock`;
+    resultat.className = 'err';
+    // Relancer le scan après 2 secondes
+    setTimeout(() => {
+      if (scannerActif) {
+        resultat.textContent = 'Pointez le code-barres vers la caméra…';
+        resultat.className = '';
+        scannerInterval = setInterval(() => {
+          const video = document.getElementById('scanner-video');
+          if (!scannerActif || video.readyState < 2) return;
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0);
+          try {
+            const luminance = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+            const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+            const result = new ZXing.MultiFormatReader().decode(binaryBitmap);
+            if (result) { clearInterval(scannerInterval); traiterCodeScanne(result.getText()); }
+          } catch(e) {}
+        }, 250);
+      }
+    }, 2000);
+    return;
+  }
+
+  // Palette trouvée
+  if (palettesDansCamion.find(p => p.id === pal.id)) {
+    resultat.textContent = `ℹ️ Palette "${code}" déjà dans le chargement`;
+    resultat.className = 'err';
+  } else {
+    ajouterPaletteAuCamion(pal.id);
+    const lot = lots.find(l => l.id === pal.lot_id);
+    resultat.textContent = `✅ ${code} — ${lot ? lot.espece + ' ' + lot.variete : ''} ajoutée !`;
+    resultat.className = 'ok';
+  }
+
+  // Fermer le scanner après 1.5 secondes
+  setTimeout(() => fermerScanner(), 1500);
+}
+
 </script>
 
 
