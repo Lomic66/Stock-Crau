@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+t<!DOCTYPE html>
 <!-- saved from url=(0046)https://iridescent-pegasus-cce295.netlify.app/ -->
 <html lang="fr"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
@@ -786,7 +786,40 @@ const SUPABASE_URL = 'https://vjptwetkczarxdfnrbiw.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqcHR3ZXRrY3phcnhkZm5yYml3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNzk0NTUsImV4cCI6MjA5Njg1NTQ1NX0.d6TnwtMFmpU6wfuSJX9dadElfXl-6-q645bpQZz4M9E';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let lots = [], palettes = [], camions = [];
+let lots = [], palettes = [], camions = [], parcelles = [];
+function getParcelleByCode(code) {
+  if (!code) return null;
+
+  return parcelles.find(p =>
+    (p.code_parcelle || '').trim().toUpperCase() ===
+    code.trim().toUpperCase()
+  );
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('codeParcelle');
+  const espece = document.getElementById('espece');
+  const variete = document.getElementById('variete');
+
+  if (!input || !espece || !variete) return;
+
+  input.addEventListener('input', () => {
+    const parcelle = getParcelleByCode(input.value);
+
+    if (parcelle) {
+      espece.value = parcelle.espece || '';
+      variete.value = parcelle.variete || '';
+
+      espece.disabled = true;
+      variete.disabled = true;
+    } else {
+      espece.value = '';
+      variete.value = '';
+
+      espece.disabled = false;
+      variete.disabled = false;
+    }
+  });
+});
 let palettesDansCamion = [];
 let camionEnEdition = null; // pour modal détail camion
 let palettesAjoutees = []; // ajouts dans modal édition camion
@@ -824,14 +857,17 @@ async function init() {
 }
 
 async function chargerDonnees() {
-  const [rL, rP, rC] = await Promise.all([
+  const [rL, rP, rC, rPar] = await Promise.all([
     sb.from('lots').select('*').order('created_at', { ascending: true }),
     sb.from('palettes').select('*').order('created_at', { ascending: true }),
-    sb.from('camions').select('*').order('created_at', { ascending: false })
+    sb.from('camions').select('*').order('created_at', { ascending: false }),
+    sb.from('parcelles').select('*').order('code_parcelle', { ascending: true })
   ]);
+
   lots = rL.data || [];
   palettes = rP.data || [];
   camions = rC.data || [];
+  parcelles = rPar.data || [];
 }
 
 function abonnements() {
