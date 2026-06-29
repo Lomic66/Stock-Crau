@@ -1902,6 +1902,14 @@ async function sauvegarderLot() {
   const date = document.getElementById('nl-date').value;
   if (!num||!parcelle||!variete||!date) { alert('Remplissez tous les champs obligatoires (*)'); return; }
 
+  // Vérifier si le numéro de lot existe déjà
+  const { data: existant } = await sb.from('lots').select('id, parcelle, espece, variete').eq('numero_lot', num);
+  if (existant && existant.length > 0) {
+    const detail = existant.map(l => `• Lot ${num} — ${l.espece} / ${l.variete} (parcelle ${l.parcelle})`).join('\n');
+    const continuer = confirm(`⚠️ Le numéro de lot ${num} existe déjà :\n${detail}\n\nVoulez-vous continuer avec ce numéro ?\n(Annuler pour choisir un autre numéro)`);
+    if (!continuer) return;
+  }
+
   const { data: lot, error: eL } = await sb.from('lots').insert({ numero_lot: num, parcelle, espece, variete, date_recolte: date }).select().single();
   if (eL) { alert('Erreur lot : ' + eL.message); return; }
 
@@ -1991,10 +1999,19 @@ function ajouterPaletteEditForm(pal) {
   div.className = 'palette-edit-row';
   div.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:8px;align-items:end;margin-bottom:8px;';
   if (pal) div.dataset.palId = pal.id;
+  // Calculer le prochain numéro de palette automatiquement
+  let numAuto = '';
+  if (!pal) {
+    const numLot = document.getElementById('el-num').value.trim();
+    const existantes = document.querySelectorAll('#palettes-edit-form .palette-edit-row').length;
+    const palsLot = lotEnEdition ? palettes.filter(p => p.lot_id === lotEnEdition.id) : [];
+    const maxIdx = palsLot.length + existantes + 1;
+    numAuto = numLot ? `${numLot}-${maxIdx}` : '';
+  }
   div.innerHTML = `
     <div>
       <label>N° Palette</label>
-      <input class="pef-num" value="${pal ? pal.numero_palette : ''}" placeholder="ex: 70450-1">
+      <input class="pef-num" value="${pal ? pal.numero_palette : numAuto}" placeholder="ex: 70450-1">
     </div>
     <div>
       <label>Format</label>
