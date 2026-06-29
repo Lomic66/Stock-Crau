@@ -681,6 +681,7 @@ t<!DOCTYPE html>
         <div class="combo-wrap">
           <input id="nl-parcelle" placeholder="Tapez le code parcelle (ex: 1.01)…" autocomplete="off"
             oninput="filtrerParcellesCombo('nl')"
+            onclick="ouvrirComboParcel('nl')"
             onblur="setTimeout(()=>fermerComboParcel('nl'),200)">
           <div id="nl-parcelle-list" class="combo-list"></div>
         </div>
@@ -765,7 +766,7 @@ t<!DOCTYPE html>
       <div>
         <label>Parcelle *</label>
         <div class="combo-wrap">
-          <input id="el-parcelle" placeholder="ex: 1.01" autocomplete="off" oninput="filtrerParcellesCombo('el')" onblur="setTimeout(()=>fermerComboParcel('el'),180)">
+          <input id="el-parcelle" placeholder="ex: 1.01" autocomplete="off" oninput="filtrerParcellesCombo('el')" onclick="ouvrirComboParcel('el')" onblur="setTimeout(()=>fermerComboParcel('el'),180)">
           <div id="el-parcelle-list" class="combo-list"></div>
         </div>
       </div>
@@ -823,8 +824,19 @@ function labelParcelle(p) {
 
 // Ouvre la combo et affiche toutes les parcelles
 function ouvrirComboParcel(prefix) {
-  filtrerParcellesCombo(prefix);
-  document.getElementById(prefix + '-parcelle-list').classList.add('open');
+  const input = document.getElementById(prefix + '-parcelle');
+  const list  = document.getElementById(prefix + '-parcelle-list');
+  const q = input.value.trim().toLowerCase();
+  // Si champ vide : afficher toutes les parcelles
+  if (!q) {
+    list.innerHTML = parcelles.length
+      ? parcelles.map(p => `<div class="combo-item" onmousedown="selectionnerParcelle('${prefix}','${p.code_parcelle}')">${labelParcelle(p)}</div>`).join('')
+      : '<div class="combo-item" style="color:#aaa;font-style:italic">Aucune parcelle trouvée</div>';
+    list.classList.add('open');
+  } else {
+    filtrerParcellesCombo(prefix);
+    list.classList.add('open');
+  }
 }
 function fermerComboParcel(prefix) {
   document.getElementById(prefix + '-parcelle-list').classList.remove('open');
