@@ -550,7 +550,12 @@ t<!DOCTYPE html>
       <div>
         <label>Espèce *</label>
         <select id="nl-espece" onchange="chargerVarietesSelect()">
-          <option value="">— sélectionner —</option>
+          <option value="">— sélectionner une parcelle —</option>
+          <option value="Pêche jaune">Pêche jaune</option>
+          <option value="Pêche blanche">Pêche blanche</option>
+          <option value="Nectarine jaune">Nectarine jaune</option>
+          <option value="Nectarine blanche">Nectarine blanche</option>
+          <option value="Abricot">Abricot</option>
         </select>
       </div>
       <div>
@@ -628,7 +633,11 @@ t<!DOCTYPE html>
       <div>
         <label>Espèce *</label>
         <select id="el-espece" onchange="chargerVarietesSelectEdit()">
-          <option value="">— sélectionner —</option>
+          <option value="Pêche jaune">Pêche jaune</option>
+          <option value="Pêche blanche">Pêche blanche</option>
+          <option value="Nectarine jaune">Nectarine jaune</option>
+          <option value="Nectarine blanche">Nectarine blanche</option>
+          <option value="Abricot">Abricot</option>
         </select>
       </div>
       <div>
@@ -673,7 +682,7 @@ function labelParcelle(p) {
   return `${p.code_parcelle} — ${p.espece} · ${p.variete}`;
 }
 
-// Ouvre la combo et affiche toutes les parcelles
+// Ouvre la combo et affiche toutes les parcelles (ou filtre si texte saisi)
 function ouvrirComboParcel(prefix) {
   const input = document.getElementById(prefix + '-parcelle');
   const list  = document.getElementById(prefix + '-parcelle-list');
@@ -682,13 +691,12 @@ function ouvrirComboParcel(prefix) {
     ? parcelles.filter(p =>
         (p.code_parcelle||'').toLowerCase().includes(q) ||
         (p.espece||'').toLowerCase().includes(q) ||
-        (p.variete||'').toLowerCase().includes(q)
-      )
+        (p.variete||'').toLowerCase().includes(q))
     : parcelles;
   list.innerHTML = source.length
     ? source.map(p => `<div class="combo-item" onmousedown="selectionnerParcelle('${prefix}','${p.code_parcelle}')">${labelParcelle(p)}</div>`).join('')
     : parcelles.length === 0
-      ? '<div class="combo-item" style="color:#e74;font-style:italic">⚠️ Aucune parcelle chargée — vérifie la RLS Supabase</div>'
+      ? '<div class="combo-item" style="color:#e55;font-style:italic">⚠️ Aucune parcelle chargée (vérifie la RLS Supabase)</div>'
       : '<div class="combo-item" style="color:#aaa;font-style:italic">Aucune correspondance</div>';
   list.classList.add('open');
 }
@@ -786,37 +794,34 @@ function setRef(cle, val) { localStorage.setItem('ref_' + cle, JSON.stringify(va
 
 function getVarietes() { return getRef('varietes') || JSON.parse(JSON.stringify(VARIETES_DEFAULT)); }
 
-// Variétés tirées de la table parcelles (par espèce)
-function getVarietesParcelles(espece) {
-  const especeMap = {
+// Variétés tirées de la table parcelles Supabase (par espèce normalisée)
+function normaliserEspece(raw) {
+  const map = {
     'PECHE JAUNE':'Pêche jaune','PÊCHE JAUNE':'Pêche jaune',
     'PECHE BLANCHE':'Pêche blanche','PÊCHE BLANCHE':'Pêche blanche',
     'NECTARINE JAUNE':'Nectarine jaune','NECTARINE BLANCHE':'Nectarine blanche',
     'ABRICOT':'Abricot'
   };
-  const varietes = [...new Set(
+  return map[(raw||'').toUpperCase().trim()] || raw;
+}
+function getVarietesParcelles(espece) {
+  return [...new Set(
     parcelles
-      .filter(p => {
-        const e = especeMap[(p.espece||'').toUpperCase().trim()] || p.espece;
-        return e === espece;
-      })
+      .filter(p => normaliserEspece(p.espece) === espece)
       .map(p => (p.variete||'').trim())
       .filter(Boolean)
   )].sort();
-  return varietes;
 }
-
-// Toutes les espèces uniques de la table parcelles (normalisées)
 function getEspecesParcelles() {
-  const especeMap = {
-    'PECHE JAUNE':'Pêche jaune','PÊCHE JAUNE':'Pêche jaune',
-    'PECHE BLANCHE':'Pêche blanche','PÊCHE BLANCHE':'Pêche blanche',
-    'NECTARINE JAUNE':'Nectarine jaune','NECTARINE BLANCHE':'Nectarine blanche',
-    'ABRICOT':'Abricot'
-  };
-  return [...new Set(
-    parcelles.map(p => especeMap[(p.espece||'').toUpperCase().trim()] || p.espece).filter(Boolean)
-  )].sort();
+  return [...new Set(parcelles.map(p => normaliserEspece(p.espece)).filter(Boolean))].sort();
+}
+function populerEspecesSelect(selectId, valeurActuelle) {
+  const especes = getEspecesParcelles();
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— sélectionner —</option>' +
+    especes.map(e => `<option value="${e}">${e}</option>`).join('');
+  if (valeurActuelle && especes.includes(valeurActuelle)) sel.value = valeurActuelle;
 }
 function getTransporteurs() { return getRef('transporteurs') || []; }
 function getImmatriculations() { return getRef('immatriculations') || []; }
@@ -1722,10 +1727,10 @@ async function openModalLot() {
     console.log('Parcelles chargées :', parcelles.slice(0,3));
   }
 
-  populerEspecesSelect('nl-espece');
+  populerEspecesSelect('nl-espece', '');
   ajouterPaletteForm();
   document.getElementById('modal-lot').style.display = 'flex';
-  // Pas de .focus() ici : évite l'ouverture automatique de la liste
+  // pas de .focus() : évite l'ouverture automatique
 }
 function closeModalLot() { document.getElementById('modal-lot').style.display = 'none'; }
 
@@ -1831,8 +1836,7 @@ function openModalEditLot(lotId) {
   // Réactiver espèce/variété (au cas où un précédent choix les aurait verrouillés)
   document.getElementById('el-espece').disabled = false;
   document.getElementById('el-variete').disabled = false;
-  populerEspecesSelect('el-espece');
-  document.getElementById('el-espece').value = lotEnEdition.espece;
+  populerEspecesSelect('el-espece', lotEnEdition.espece);
   document.getElementById('el-date').value = lotEnEdition.date_recolte;
   chargerVarietesSelectEdit();
   document.getElementById('el-variete').value = lotEnEdition.variete;
@@ -1866,22 +1870,10 @@ function chargerVarietesSelectEdit() {
   const espece = document.getElementById('el-espece').value;
   const varietes = getVarietesParcelles(espece);
   const sel = document.getElementById('el-variete');
-  // Inclure aussi la variété actuelle du lot si elle n'est pas dans parcelles
+  // Inclure la variété actuelle si absente des parcelles
   const varActuelle = lotEnEdition ? lotEnEdition.variete : '';
-  const toutes = varActuelle && !varietes.includes(varActuelle)
-    ? [varActuelle, ...varietes]
-    : varietes;
+  const toutes = varActuelle && !varietes.includes(varActuelle) ? [varActuelle, ...varietes] : varietes;
   sel.innerHTML = '<option value="">— choisir —</option>' + toutes.map(v => `<option value="${v}">${v}</option>`).join('');
-}
-
-function populerEspecesSelect(selectId) {
-  const especes = getEspecesParcelles();
-  const sel = document.getElementById(selectId);
-  if (!sel) return;
-  const current = sel.value;
-  sel.innerHTML = '<option value="">— sélectionner —</option>' +
-    especes.map(e => `<option value="${e}">${e}</option>`).join('');
-  if (current && especes.includes(current)) sel.value = current;
 }
 
 function ajouterPaletteEditForm(pal) {
@@ -1984,23 +1976,20 @@ function choisirCombo(inputId, listId, val) {
 
 // ─── RÉFÉRENTIELS ───
 function renderReferentiels() {
-  const varietes = getVarietes();
-  const especes = ['Pêche jaune','Pêche blanche','Nectarine jaune','Nectarine blanche','Abricot'];
-
-  document.getElementById('ref-varietes-content').innerHTML = especes.map(esp => `
-    <div style="margin-bottom:14px;">
-      <div style="font-weight:700;margin-bottom:6px;">${badgeEspece(esp)}</div>
-      <div id="varietes-${esp.replace(/ /g,'_')}" style="margin-bottom:6px;">
-        ${(varietes[esp]||[]).map(v => `
-          <span class="variete-tag">${v}
-            <button onclick="supprimerVariete('${esp}','${v}')" title="Supprimer">×</button>
-          </span>`).join('')}
-      </div>
-      <div class="gap-8">
-        <input id="nv-${esp.replace(/ /g,'_')}" placeholder="Nouvelle variété…" style="flex:1;min-width:140px;" onkeydown="if(event.key==='Enter')ajouterVariete('${esp}')">
-        <button class="btn btn-vert btn-sm" onclick="ajouterVariete('${esp}')">Ajouter</button>
-      </div>
-    </div>`).join('<hr class="sep">');
+  // Variétés depuis la table parcelles Supabase (lecture seule)
+  const especes = getEspecesParcelles();
+  if (especes.length) {
+    document.getElementById('ref-varietes-content').innerHTML = especes.map(esp => {
+      const vars = getVarietesParcelles(esp);
+      return `<div style="margin-bottom:14px;">
+        <div style="font-weight:700;margin-bottom:6px;">${badgeEspece(esp)}</div>
+        <div>${vars.map(v => `<span class="variete-tag">${v}</span>`).join('')}</div>
+      </div>`;
+    }).join('<hr class="sep">');
+  } else {
+    document.getElementById('ref-varietes-content').innerHTML =
+      '<div class="alerte">Aucune parcelle chargée depuis Supabase.</div>';
+  }
 
   const transList = getTransporteurs();
   document.getElementById('ref-transp-content').innerHTML = transList.length
