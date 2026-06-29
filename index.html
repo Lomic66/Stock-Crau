@@ -341,7 +341,8 @@ t<!DOCTYPE html>
 </header>
 
 <nav>
-  <button class="active" onclick="afficherSection(&#39;frigo&#39;,this)">🧊 Frigo / Stock</button>
+  <button class="active" onclick="afficherSection(&#39;frigo&#39;,this)">🧊 Frigo</button>
+  <button onclick="afficherSection(&#39;stock&#39;,this)">📦 Stock</button>
   <button onclick="afficherSection(&#39;chargement&#39;,this)" class="">🚛 Préparation camion</button>
   <button onclick="afficherSection(&#39;attente&#39;,this)">⏳ Camions en attente</button>
   <button onclick="afficherSection(&#39;camions&#39;,this)">📋 Camions partis</button>
@@ -379,6 +380,15 @@ t<!DOCTYPE html>
       </button>
     </div>
     <div id="frigo-content"><div class="alerte">Aucun lot en stock pour ce filtre.</div></div>
+  </div>
+
+
+  <!-- ═══════ STOCK ═══════ -->
+  <div id="sec-stock" class="section">
+    <div class="card">
+      <div class="card-title">📦 Inventaire du stock — par espèce</div>
+      <div id="stock-content"><div class="alerte">Chargement…</div></div>
+    </div>
   </div>
 
   <!-- ═══════ PRÉPARATION CAMION ═══════ -->
@@ -830,6 +840,7 @@ function getImmatriculations() { return getRef('immatriculations') || []; }
 async function init() {
   await chargerDonnees();
   renderFrigo();
+  renderStock();
   renderFrigoChargement();
   renderJauge();
   renderPlanCamion();
@@ -871,6 +882,7 @@ function afficherSection(id, btn) {
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.getElementById('sec-' + id).classList.add('active');
   if (btn) btn.classList.add('active');
+  if (id === 'stock') renderStock();
   if (id === 'chargement') { renderFrigoChargement(); renderJauge(); renderPlanCamion(); }
   if (id === 'attente') renderCamionsAttente();
   if (id === 'referentiels') renderReferentiels();
@@ -934,6 +946,88 @@ function renderFrigo() {
       </div>
     </div>`;
   }).join('');
+}
+
+
+// ─── STOCK ───
+function renderStock() {
+  const el = document.getElementById('stock-content');
+  if (!el) return;
+
+  // Uniquement les palettes en stock
+  const palsStock = palettes.filter(p => p.statut === 'stock');
+  if (!palsStock.length) {
+    el.innerHTML = '<div class="alerte">Aucune palette en stock.</div>';
+    return;
+  }
+
+  // Regrouper par espèce puis variété
+  const parEspece = {};
+  palsStock.forEach(pal => {
+    const lot = lots.find(l => l.id === pal.lot_id);
+    if (!lot) return;
+    const esp = lot.espece || '—';
+    const vari = lot.variete || '—';
+    if (!parEspece[esp]) parEspece[esp] = { nb: 0, poids: 0, varietes: {} };
+    parEspece[esp].nb++;
+    parEspece[esp].poids += pal.poids_kg || 0;
+    if (!parEspece[esp].varietes[vari]) parEspece[esp].varietes[vari] = { nb: 0, poids: 0 };
+    parEspece[esp].varietes[vari].nb++;
+    parEspece[esp].varietes[vari].poids += pal.poids_kg || 0;
+  });
+
+  const totalPals = palsStock.length;
+  const totalPoids = palsStock.reduce((s, p) => s + (p.poids_kg || 0), 0);
+
+  el.innerHTML = `
+    <table style="margin-bottom:12px;">
+      <thead><tr>
+        <th style="width:32px;"></th>
+        <th>Espèce / Variété</th>
+        <th style="text-align:right;">Palettes</th>
+        <th style="text-align:right;">Poids total</th>
+        <th style="text-align:right;">% du stock</th>
+      </tr></thead>
+      <tbody>
+        ${Object.entries(parEspece).map(([esp, data], idx) => {
+          const pct = Math.round((data.nb / totalPals) * 100);
+          const varRows = Object.entries(data.varietes).map(([vari, vdata]) => `
+            <tr class="stock-variete-row" id="stock-var-${idx}" style="display:none;background:var(--gris);">
+              <td></td>
+              <td style="padding-left:28px;font-size:.83rem;color:#555;">↳ ${vari}</td>
+              <td style="text-align:right;font-size:.83rem;">${vdata.nb}</td>
+              <td style="text-align:right;font-size:.83rem;">${Math.round(vdata.poids)} kg</td>
+              <td style="text-align:right;font-size:.83rem;">${Math.round((vdata.nb/totalPals)*100)}%</td>
+            </tr>`).join('');
+          return `
+            <tr class="tr-cliquable stock-espece-row" onclick="toggleStockEspece(${idx})" style="font-weight:600;">
+              <td style="text-align:center;color:var(--vert-c);font-size:.9rem;" id="stock-chevron-${idx}">▶</td>
+              <td>${badgeEspece(esp)}</td>
+              <td style="text-align:right;">${data.nb}</td>
+              <td style="text-align:right;">${Math.round(data.poids)} kg</td>
+              <td style="text-align:right;">${pct}%</td>
+            </tr>
+            ${varRows}`;
+        }).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="font-weight:700;border-top:2px solid var(--gris-b);">
+          <td></td>
+          <td>Total</td>
+          <td style="text-align:right;">${totalPals}</td>
+          <td style="text-align:right;">${Math.round(totalPoids)} kg</td>
+          <td style="text-align:right;">100%</td>
+        </tr>
+      </tfoot>
+    </table>`;
+}
+
+function toggleStockEspece(idx) {
+  const rows = document.querySelectorAll(`#stock-var-${idx}`);
+  const chevron = document.getElementById(`stock-chevron-${idx}`);
+  const isOpen = chevron.textContent === '▼';
+  rows.forEach(r => r.style.display = isOpen ? 'none' : '');
+  chevron.textContent = isOpen ? '▶' : '▼';
 }
 
 function remplirOptions(selectId, valeurs, valeurCourante) {
