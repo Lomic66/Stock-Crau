@@ -2096,10 +2096,11 @@ function ajouterPaletteEditForm(pal) {
   let numAuto = '';
   if (!pal) {
     const numLot = document.getElementById('el-num').value.trim();
+    // Basé uniquement sur les lignes actuellement affichées (les palettes supprimées
+    // ont déjà été retirées du DOM) : la numérotation reprend donc juste après la
+    // dernière ligne visible, sans sauter le numéro d'une palette supprimée.
     const existantes = document.querySelectorAll('#palettes-edit-form .palette-edit-row').length;
-    const palsLot = lotEnEdition ? palettes.filter(p => p.lot_id === lotEnEdition.id) : [];
-    const maxIdx = palsLot.length + existantes + 1;
-    numAuto = numLot ? `${numLot}-${String(maxIdx).padStart(2,'0')}` : '';
+    numAuto = numLot ? `${numLot}-${String(existantes + 1).padStart(2,'0')}` : '';
   }
   div.innerHTML = `
     <div>
