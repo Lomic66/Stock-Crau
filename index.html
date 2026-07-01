@@ -504,7 +504,18 @@ t<!DOCTYPE html>
   <!-- ═══════ CAMIONS PARTIS ═══════ -->
   <div id="sec-camions" class="section">
     <div class="card">
-      <div class="card-title">🚛 Camions expédiés</div>
+      <div class="card-title" style="flex-wrap:wrap;gap:10px;">
+        <span>🚛 Camions expédiés</span>
+        <div style="display:flex;gap:8px;align-items:center;margin-left:auto;font-size:.85rem;font-weight:400;flex-wrap:wrap;">
+          <select id="cp-filtre-transp" onchange="renderCamions()" style="padding:6px 8px;border:1.5px solid var(--gris-b);border-radius:6px;">
+            <option value="">Tous les transporteurs</option>
+          </select>
+          <input id="cp-filtre-date-debut" type="date" onchange="renderCamions()" style="padding:6px 8px;border:1.5px solid var(--gris-b);border-radius:6px;" title="Départ à partir du">
+          <span>→</span>
+          <input id="cp-filtre-date-fin" type="date" onchange="renderCamions()" style="padding:6px 8px;border:1.5px solid var(--gris-b);border-radius:6px;" title="Départ jusqu'au">
+          <button class="btn btn-gris btn-sm" onclick="reinitialiserFiltresCamionsPartis()">✕ Réinitialiser</button>
+        </div>
+      </div>
       <div id="camions-content"><div style="overflow-x:auto"><table>
     <thead><tr>
       <th>Transporteur</th><th>Immat.</th><th>Arrivée</th><th>Départ</th>
@@ -600,7 +611,7 @@ t<!DOCTYPE html>
 </main>
 
 <!-- ══════════════ MODAL NOUVEAU LOT ══════════════ -->
-<div id="modal-lot" class="modal-bg" style="display:none;" onclick="if(event.target===this)closeModalLot()">
+<div id="modal-lot" class="modal-bg" style="display:none;">
   <div class="modal">
     <h2>➕ Nouveau lot</h2>
     <div class="form-grid">
@@ -650,7 +661,7 @@ t<!DOCTYPE html>
 </div>
 
 <!-- ══════════════ MODAL DÉTAIL CAMION ══════════════ -->
-<div id="modal-camion" class="modal-bg" style="display:none;" onclick="if(event.target===this)closeModalCamion()">
+<div id="modal-camion" class="modal-bg" style="display:none;">
   <div class="modal" style="max-width:720px;">
     <h2 id="mc-titre">Détail camion</h2>
     <div id="mc-infos" class="form-grid" style="margin-bottom:14px;"></div>
@@ -679,15 +690,17 @@ t<!DOCTYPE html>
       <span style="margin-left:8px;">Pivoter une palette : bouton ⤾ · double-clic pour retirer du camion</span>
     </div>
     <div class="flex-end mt-12">
+      <button class="btn btn-rouge" id="mc-btn-supprimer" style="display:none;" onclick="supprimerCamionPreparation()">🗑 Supprimer ce camion</button>
+      <button class="btn btn-jaune" id="mc-btn-annuler-depart" style="display:none;" onclick="annulerDepartCamion()">↩️ Remettre en préparation</button>
       <button class="btn btn-gris" onclick="closeModalCamion()">Fermer</button>
-      <button class="btn btn-vert" onclick="sauvegarderModifCamion()">💾 Enregistrer les modifications</button>
+      <button class="btn btn-vert" id="mc-btn-enregistrer" onclick="sauvegarderModifCamion()">💾 Enregistrer les modifications</button>
       <button class="btn btn-vert" id="mc-btn-parti" style="display:none;" onclick="marquerCamionParti()">🚛 Camion parti — sortir du stock</button>
     </div>
   </div>
 </div>
 
 <!-- ══════════════ MODAL ÉDITION LOT ══════════════ -->
-<div id="modal-edit-lot" class="modal-bg" style="display:none;" onclick="if(event.target===this)closeModalEditLot()">
+<div id="modal-edit-lot" class="modal-bg" style="display:none;">
   <div class="modal">
     <h2>✎ Modifier le lot</h2>
     <div class="form-grid">
@@ -1021,7 +1034,7 @@ function renderStock() {
     return;
   }
 
-  // Regrouper par espèce puis variété
+  // Regrouper par espèce puis variété puis lot
   const parEspece = {};
   palsStock.forEach(pal => {
     const lot = lots.find(l => l.id === pal.lot_id);
@@ -1031,9 +1044,13 @@ function renderStock() {
     if (!parEspece[esp]) parEspece[esp] = { nb: 0, poids: 0, varietes: {} };
     parEspece[esp].nb++;
     parEspece[esp].poids += pal.poids_kg || 0;
-    if (!parEspece[esp].varietes[vari]) parEspece[esp].varietes[vari] = { nb: 0, poids: 0 };
+    if (!parEspece[esp].varietes[vari]) parEspece[esp].varietes[vari] = { nb: 0, poids: 0, lots: {} };
     parEspece[esp].varietes[vari].nb++;
     parEspece[esp].varietes[vari].poids += pal.poids_kg || 0;
+    const numLot = lot.numero_lot || '—';
+    if (!parEspece[esp].varietes[vari].lots[numLot]) parEspece[esp].varietes[vari].lots[numLot] = { nb: 0, poids: 0 };
+    parEspece[esp].varietes[vari].lots[numLot].nb++;
+    parEspece[esp].varietes[vari].lots[numLot].poids += pal.poids_kg || 0;
   });
 
   const totalPals = palsStock.length;
@@ -1051,14 +1068,25 @@ function renderStock() {
       <tbody>
         ${Object.entries(parEspece).map(([esp, data], idx) => {
           const pct = Math.round((data.nb / totalPals) * 100);
-          const varRows = Object.entries(data.varietes).map(([vari, vdata]) => `
-            <tr class="stock-variete-row" id="stock-var-${idx}" style="display:none;background:var(--gris);">
-              <td></td>
+          const varRows = Object.entries(data.varietes).map(([vari, vdata], vidx) => {
+            const lotRows = Object.entries(vdata.lots).map(([numLot, ldata]) => `
+              <tr class="stock-lot-row" id="stock-lot-${idx}-${vidx}" style="display:none;background:var(--blanc);">
+                <td></td>
+                <td style="padding-left:48px;font-size:.8rem;color:#777;">‣ Lot ${numLot}</td>
+                <td style="text-align:right;font-size:.8rem;color:#777;">${ldata.nb}</td>
+                <td style="text-align:right;font-size:.8rem;color:#777;">${Math.round(ldata.poids)} kg</td>
+                <td style="text-align:right;font-size:.8rem;color:#777;">${Math.round((ldata.nb/totalPals)*100)}%</td>
+              </tr>`).join('');
+            return `
+            <tr class="tr-cliquable stock-variete-row" id="stock-var-${idx}" onclick="toggleStockVariete(${idx},${vidx})" style="display:none;background:var(--gris);">
+              <td style="text-align:center;color:var(--vert-c);font-size:.8rem;" id="stock-var-chevron-${idx}-${vidx}">▶</td>
               <td style="padding-left:28px;font-size:.83rem;color:#555;">↳ ${vari}</td>
               <td style="text-align:right;font-size:.83rem;">${vdata.nb}</td>
               <td style="text-align:right;font-size:.83rem;">${Math.round(vdata.poids)} kg</td>
               <td style="text-align:right;font-size:.83rem;">${Math.round((vdata.nb/totalPals)*100)}%</td>
-            </tr>`).join('');
+            </tr>
+            ${lotRows}`;
+          }).join('');
           return `
             <tr class="tr-cliquable stock-espece-row" onclick="toggleStockEspece(${idx})" style="font-weight:600;">
               <td style="text-align:center;color:var(--vert-c);font-size:.9rem;" id="stock-chevron-${idx}">▶</td>
@@ -1085,6 +1113,14 @@ function renderStock() {
 function toggleStockEspece(idx) {
   const rows = document.querySelectorAll(`#stock-var-${idx}`);
   const chevron = document.getElementById(`stock-chevron-${idx}`);
+  const isOpen = chevron.textContent === '▼';
+  rows.forEach(r => r.style.display = isOpen ? 'none' : '');
+  chevron.textContent = isOpen ? '▶' : '▼';
+}
+
+function toggleStockVariete(idx, vidx) {
+  const rows = document.querySelectorAll(`#stock-lot-${idx}-${vidx}`);
+  const chevron = document.getElementById(`stock-var-chevron-${idx}-${vidx}`);
   const isOpen = chevron.textContent === '▼';
   rows.forEach(r => r.style.display = isOpen ? 'none' : '');
   chevron.textContent = isOpen ? '▶' : '▼';
@@ -1588,13 +1624,72 @@ function viderChargement() {
 
 
 // ─── CAMIONS PARTIS ───
+let cpTriColonne = 'depart';
+let cpTriSens = 'desc';
+
+function trierCamionsPartisParColonne(col) {
+  if (cpTriColonne === col) {
+    cpTriSens = cpTriSens === 'asc' ? 'desc' : 'asc';
+  } else {
+    cpTriColonne = col;
+    cpTriSens = 'asc';
+  }
+  renderCamions();
+}
+
+function reinitialiserFiltresCamionsPartis() {
+  document.getElementById('cp-filtre-transp').value = '';
+  document.getElementById('cp-filtre-date-debut').value = '';
+  document.getElementById('cp-filtre-date-fin').value = '';
+  renderCamions();
+}
+
 function renderCamions() {
   const el = document.getElementById('camions-content');
-  const cams = camions.filter(c => c.statut === 'parti');
+  let cams = camions.filter(c => c.statut === 'parti');
+
+  // Remplir la liste des transporteurs dans le filtre (sans écraser la sélection en cours)
+  const selTransp = document.getElementById('cp-filtre-transp');
+  if (selTransp) {
+    const valCourante = selTransp.value;
+    const transportsUniques = [...new Set(cams.map(c => c.transporteur).filter(Boolean))].sort();
+    selTransp.innerHTML = '<option value="">Tous les transporteurs</option>' +
+      transportsUniques.map(t => `<option value="${t}">${t}</option>`).join('');
+    if (transportsUniques.includes(valCourante)) selTransp.value = valCourante;
+  }
+
   if (!cams.length) { el.innerHTML = '<div class="alerte">Aucun camion expédié pour le moment.</div>'; return; }
+
+  // Filtres
+  const filtreTransp = document.getElementById('cp-filtre-transp')?.value || '';
+  const filtreDebut = document.getElementById('cp-filtre-date-debut')?.value || '';
+  const filtreFin = document.getElementById('cp-filtre-date-fin')?.value || '';
+
+  if (filtreTransp) cams = cams.filter(c => c.transporteur === filtreTransp);
+  if (filtreDebut) cams = cams.filter(c => c.date_heure_depart && c.date_heure_depart.slice(0,10) >= filtreDebut);
+  if (filtreFin) cams = cams.filter(c => c.date_heure_depart && c.date_heure_depart.slice(0,10) <= filtreFin);
+
+  if (!cams.length) { el.innerHTML = '<div class="alerte">Aucun camion ne correspond aux filtres.</div>'; return; }
+
+  // Tri
+  cams = [...cams].sort((a, b) => {
+    let va, vb;
+    if (cpTriColonne === 'transporteur') { va = a.transporteur || ''; vb = b.transporteur || ''; }
+    else if (cpTriColonne === 'arrivee') { va = a.date_heure_arrivee || ''; vb = b.date_heure_arrivee || ''; }
+    else { va = a.date_heure_depart || ''; vb = b.date_heure_depart || ''; }
+    if (va < vb) return cpTriSens === 'asc' ? -1 : 1;
+    if (va > vb) return cpTriSens === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const fleche = (col) => cpTriColonne === col ? (cpTriSens === 'asc' ? ' ▲' : ' ▼') : '';
+
   el.innerHTML = `<div style="overflow-x:auto"><table>
     <thead><tr>
-      <th>Transporteur</th><th>Immat.</th><th>Arrivée</th><th>Départ</th>
+      <th class="tr-cliquable" onclick="trierCamionsPartisParColonne('transporteur')">Transporteur${fleche('transporteur')}</th>
+      <th>Immat.</th>
+      <th class="tr-cliquable" onclick="trierCamionsPartisParColonne('arrivee')">Arrivée${fleche('arrivee')}</th>
+      <th class="tr-cliquable" onclick="trierCamionsPartisParColonne('depart')">Départ${fleche('depart')}</th>
       <th>Palettes</th><th>Poids total</th><th>Commentaire</th><th></th>
     </tr></thead><tbody>
     ${cams.map(c => {
@@ -1691,6 +1786,8 @@ function renderModalCamion() {
   }
 
   document.getElementById('mc-btn-parti').style.display = enPrep ? 'inline-block' : 'none';
+  document.getElementById('mc-btn-supprimer').style.display = enPrep ? 'inline-block' : 'none';
+  document.getElementById('mc-btn-annuler-depart').style.display = enPrep ? 'none' : 'inline-block';
 
   // Palettes actuelles (moins celles retirées)
   const palsActuelles = palettes.filter(p => p.camion_id === c.id && !palettesRetirees.includes(p.id));
@@ -1831,6 +1928,40 @@ async function marquerCamionParti() {
   await chargerDonnees();
   renderFrigo(); renderFrigoChargement(); renderCamions(); renderCamionsAttente();
   alert('Camion parti — stock mis à jour ✔');
+}
+
+async function supprimerCamionPreparation() {
+  const c = camionEnEdition;
+  if (!c || c.statut !== 'preparation') return;
+  if (!confirm(`Supprimer le camion "${c.nom || c.transporteur || 'en préparation'}" ? Les palettes qu'il contient repasseront en stock.`)) return;
+
+  const idsPals = palettes.filter(p => p.camion_id === c.id).map(p => p.id);
+  if (idsPals.length) {
+    await sb.from('palettes').update({ statut: 'stock', camion_id: null, pos_x: null, pos_y: null, rotation: 0 }).in('id', idsPals);
+  }
+  await sb.from('camions').delete().eq('id', c.id);
+
+  closeModalCamion();
+  await chargerDonnees();
+  renderFrigo(); renderFrigoChargement(); renderCamions(); renderCamionsAttente();
+  alert('Camion supprimé, palettes remises en stock ✔');
+}
+
+async function annulerDepartCamion() {
+  const c = camionEnEdition;
+  if (!c || c.statut !== 'parti') return;
+  if (!confirm(`Remettre le camion "${c.transporteur || ''} — ${c.immatriculation || ''}" en préparation ? Ses palettes redeviendront "en préparation" et le camion réapparaîtra dans "Camions en préparation".`)) return;
+
+  const idsPals = palettes.filter(p => p.camion_id === c.id).map(p => p.id);
+  if (idsPals.length) {
+    await sb.from('palettes').update({ statut: 'preparation' }).in('id', idsPals);
+  }
+  await sb.from('camions').update({ statut: 'preparation', date_heure_depart: null }).eq('id', c.id);
+
+  closeModalCamion();
+  await chargerDonnees();
+  renderFrigo(); renderFrigoChargement(); renderCamions(); renderCamionsAttente();
+  alert('Camion remis en préparation ✔');
 }
 
 function retirerDeCamion(palId) {
